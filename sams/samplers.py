@@ -114,7 +114,7 @@ class ThermodynamicState(object):
         if parameters:
             platform = openmm.Platform.getPlatformByName('Reference')
             integrator = openmm.VerletIntegrator(1.0*unit.femtoseconds)
-            context = Context(system, integrator, platform)
+            context = openmm.Context(system, integrator, platform)
             system_parameters = set(context.getParameters())
             del context, integrator
             if not set(parameters).issubset(system_parameters):
@@ -155,10 +155,10 @@ class ThermodynamicState(object):
 
         # Set pressure
         if self.pressure:
-            forces = { system.getForce(index).__class__.__name__ : system.getForce(index) for index in range(system.getNumForces()) }
+            forces = { self.system.getForce(index).__class__.__name__ : self.system.getForce(index) for index in range(self.system.getNumForces()) }
             barostat = forces['MonteCarloBarostat']
             # TODO: Make sure this is the correct way to set temperature/pressure
-            barostat.setTemperature(temperature)
+            barostat.setTemperature(self.temperature)
             context.setParameter(barostat.Pressure(), self.pressure.value_in_unit_system(unit.md_unit_system))
 
         # Set Context parameters
@@ -646,6 +646,7 @@ class ExpandedEnsembleSampler(object):
         self.log_P_k = log_P_k
 
         if self.verbose:
+            print('Current thermodynamic state index is %d' % self.thermodynamic_state_index)
             print('log_P_k for neighborhood %s ' % neighborhood)
             print(log_P_k)
 
@@ -684,6 +685,9 @@ class ExpandedEnsembleSampler(object):
         Update sampler statistics.
         """
         self.number_of_state_visits[self.thermodynamic_state_index] += 1.0
+        if self.verbose:
+            print('Number of times each state has been visited:')
+            print(self.number_of_state_visits)
 
 ################################################################################
 # SAMS SAMPLER
