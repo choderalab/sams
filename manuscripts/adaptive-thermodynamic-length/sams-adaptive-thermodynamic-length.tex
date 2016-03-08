@@ -1,0 +1,190 @@
+% PRL look and style (easy on the eyes)
+\RequirePackage[hyphens]{url}
+\documentclass[aps,pre,twocolumn,nofootinbib,superscriptaddress,linenumbers,11point]{revtex4-1}
+% Two-column style (for submission/review/editing)
+%\documentclass[aps,prl,preprint,nofootinbib,superscriptaddress,linenumbers]{revtex4-1}
+
+%\usepackage{palatino}
+
+% Change to a sans serif font.
+\usepackage{sourcesanspro}
+\renewcommand*\familydefault{\sfdefault} %% Only if the base font of the document is to be sans serif
+\usepackage[T1]{fontenc}
+%\usepackage[font=sf,justification=justified]{caption}
+\usepackage[font=sf]{floatrow}
+
+% Rework captions to use sans serif font.
+\makeatletter
+\renewcommand\@make@capt@title[2]{%
+ \@ifx@empty\float@link{\@firstofone}{\expandafter\href\expandafter{\float@link}}%
+  {\textbf{#1}}\sf\@caption@fignum@sep#2\quad
+}%
+\makeatother
+
+\usepackage{listings} % For code examples
+\usepackage[usenames,dvipsnames,svgnames,table]{xcolor}
+
+\usepackage{minted}
+
+\usepackage{amsmath}
+\usepackage{amssymb}
+\usepackage{graphicx}
+%\usepackage[mathbf,mathcal]{euler}
+%\usepackage{citesort}
+\usepackage{dcolumn}
+\usepackage{boxedminipage}
+\usepackage{verbatim}
+\usepackage[colorlinks=true,citecolor=blue,linkcolor=blue]{hyperref}
+
+\usepackage{subfigure}  % use for side-by-side figures
+
+% The figures are in a figures/ subdirectory.
+\graphicspath{{figures/}}
+
+% italicized boldface for math (e.g. vectors)
+\newcommand{\bfv}[1]{{\mbox{\boldmath{$#1$}}}}
+% non-italicized boldface for math (e.g. matrices)
+\newcommand{\bfm}[1]{{\bf #1}}          
+
+%\newcommand{\bfm}[1]{{\mbox{\boldmath{$#1$}}}}
+%\newcommand{\bfm}[1]{{\bf #1}}
+%\newcommand{\expect}[1]{\left \langle #1 \right \rangle}                % <.> for denoting expectations over realizations of an experiment or thermal averages
+
+% Define some useful commands we will use repeatedly.
+\newcommand{\T}{\mathrm{T}}                                % T used in matrix transpose
+\newcommand{\tauarrow}{\stackrel{\tau}{\rightarrow}}       % the symbol tau over a right arrow
+\newcommand{\expect}[1]{\langle #1 \rangle}                % <.> for denoting expectations over realizations of an experiment or thermal averages
+\newcommand{\estimator}[1]{\hat{#1}}                       % estimator for some quantity from a finite dataset.
+\newcommand{\code}[1]{{\tt #1}}
+
+% vectors
+\newcommand{\x}{\bfv{x}}
+\newcommand{\y}{\bfv{y}}
+\newcommand{\f}{\bfv{f}}
+
+\newcommand{\bfc}{\bfm{c}}
+\newcommand{\hatf}{\hat{f}}
+
+%\newcommand{\bTheta}{\bfm{\Theta}}
+%\newcommand{\btheta}{\bfm{\theta}}
+%\newcommand{\bhatf}{\bfm{\hat{f}}}
+%\newcommand{\Cov}[1] {\mathrm{cov}\left( #1 \right)}
+%\newcommand{\Ept}[1] {{\mathrm E}\left[ #1 \right]}
+%\newcommand{\Eptk}[2] {{\mathrm E}\left[ #2 \,|\, #1\right]}
+%\newcommand{\T}{\mathrm{T}}                                % T used in matrix transpose
+%\newcommand{\conc}[1] {\left[ \mathrm{#1} \right]}
+
+\DeclareMathOperator*{\argmin}{argmin}
+\DeclareMathOperator*{\argmax}{argmax}
+\newcommand*{\argminl}{\argmin\limits}
+\newcommand*{\argmaxl}{\argmax\limits}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% DOCUMENT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{document}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% TITLE
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\title{Optimal expanded ensemble simulations via self-adjusted mixture sampling}
+
+\author{John D. Chodera}
+ \thanks{Corresponding author}
+ \email{random@choderalab.org}
+ \affiliation{Computational Biology Program, Sloan Kettering Institute, Memorial Sloan Kettering Cancer Center, New York, NY 10065}
+
+\date{\today}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ABSTRACT
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\begin{abstract}
+
+
+% KEYWORDS
+\emph{Keywords: biomolecular simulation; molecular dynamics; expanded ensembles; self-adjusted mixture sampling}
+
+\end{abstract}
+
+\maketitle
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% FIGURE: ONE-COLUMN
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+%\begin{figure}[tbp]
+%\resizebox{0.9\textwidth}{!}{\includegraphics{toc-graphic.pdf}}
+%\caption{\label{figure:example} {\bf Example figure.} 
+%This is an example figure.
+%Shaded regions denote 95\% confidence intervals.
+%}
+%\end{figure}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% INTRODUCTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{Introduction}
+\label{section:introduction}
+
+Wolf chartreuse beard, paleo bushwick locavore tumblr selvage health goth narwhal post-ironic meggings cronut DIY etsy. 
+Tote bag viral craft beer migas, brooklyn keffiyeh shabby chic wayfarers godard scenester affogato pabst. 
+Humblebrag chartreuse schlitz, post-ironic wolf ethical narwhal salvia everyday carry gastropub venmo kale chips. You probably haven't heard of them cornhole tilde readymade mixtape irony. 
+Sriracha occupy yuccie, green juice roof party fap tumblr hammock mumblecore ramps pabst. Artisan listicle truffaut kogi, shabby chic kombucha distillery etsy cronut +1 pabst mustache VHS vinyl green juice. 
+Before they sold out brooklyn yuccie, gluten-free sriracha lumbersexual four loko kombucha semiotics letterpress biodiesel kale chips art party normcore slow-carb.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% INTRODUCTION
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{Methods}
+\label{section:methods}
+
+\subsection*{Self-adjusted mixture sampling}
+
+While there are many ways to determine $\mu^*$, here, we utilize a \emph{self adjusted mixture sampling} (SAMS) simulation~\cite{sams}.
+In a SAMS simulation, we allow the number $n$ of neutral salt molecules to fluctuate dynamically and the relative reduced free energy $f_n \equiv - \ln Z_n$ of each is computed through a recursion strategy in which the $f_n$ are dynamically evolved during the simulation.
+{\color{red}[JDC: More details on SAMS.]}
+\begin{eqnarray}
+Z_n &\equiv& \int dx \, e^{-\beta [U_n(x) + p V(x)]}
+\end{eqnarray}
+where $U_n(x)$ denotes there are exactly $n$ salt pairs in the system.
+
+Once the relative reduced free energies $f_n$ have have been determined, we can compute the chemical potential $\mu^*$ by recognizing that
+\begin{eqnarray}
+\left< n \right>_{\mu, \beta, p, N} &=& \sum_{n = 0}^\infty n \, \int dx \, e^{-\beta [ U_n(x) + p V((x) + \mu n ]} \\
+&=&  \sum_{n = 0}^\infty n \, e^{\beta \mu n} \int dx \, e^{-\beta [ U_n(x) + p V((x) ]} \\
+&=&  \sum_{n = 0}^\infty n \, e^{\beta \mu n} e^{-f_n} \\
+&=&  \sum_{n = 0}^\infty n \, e^{\beta \mu n -f_n}
+\end{eqnarray}
+and write $c(\mu, \beta, p, N)$ in terms of the $\{f_n\}$ and the associated average volumes $V_n \equiv \left< V \right>_{\beta, p, N, n}$
+\begin{eqnarray}
+c(\mu, \beta, p, N) &=& \left< \frac{n}{N_A} \right>_{\mu, \beta, p, N} / \left< V \right>_{\mu, \beta, p, N} \\
+&=& \frac{\sum_{n = 0}^\infty \frac{n}{N_A} \, e^{\beta \mu n -f_n}}{\sum_{n = 0}^\infty V_n \, e^{\beta \mu n -f_n}}
+\end{eqnarray}
+which allows us to solve for $\mu^*$:
+\begin{eqnarray}
+c_0 &=& \frac{\left< \frac{n}{N_A} \right>_{\mu, \beta, p, N}}{\left< V \right>_{\mu, \beta, p, N}} \\
+&=& \frac{\sum_{n = 0}^\infty \frac{n}{N_A} \, e^{\beta \mu n -f_n}}{\sum_{n = 0}^\infty V_n \, e^{\beta \mu n -f_n}}
+\end{eqnarray}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% ACKNOWLEDGMENTS
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\section*{Acknowledgments}
+
+JDC acknowledges a Louis V.~Gerstner Young Investigator Award, NIH core grant P30-CA008748, and the Sloan Kettering Institute for funding during the course of this work.
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+% BIBLIOGRAPHY
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\bibliographystyle{prsty} 
+\bibliography{manuscript}
+
+\end{document}
