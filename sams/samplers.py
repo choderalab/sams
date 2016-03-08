@@ -451,7 +451,7 @@ class MCMCSampler(object):
         self.iteration = 0
         # For GHMC integrator
         self.collision_rate = 1.0 / unit.picoseconds
-        self.timestep = 1.0 * unit.femtoseconds
+        self.timestep = 2.0 * unit.femtoseconds
         self.nsteps = 500 # number of steps per update
         self.verbose = True
 

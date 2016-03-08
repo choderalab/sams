@@ -73,7 +73,7 @@ class SAMSTestSystem(object):
 
 class AlanineDipeptideVacuumSimulatedTempering(SAMSTestSystem):
     """
-    Alanine dipeptide in vacuum, implicit, and explicit solvents.
+    Similated tempering for alanine dipeptide in implicit solvent.
 
     Properties
     ----------
@@ -98,14 +98,11 @@ class AlanineDipeptideVacuumSimulatedTempering(SAMSTestSystem):
         self.description = 'Alanine dipeptide in vacuum simulated tempering simulation'
 
         # Create topology, positions, and system.
-        from pkg_resources import resource_filename
-        from simtk.openmm.app import PDBFile
-        pdb_filename = resource_filename('openmmtools', 'data/alanine-dipeptide-gbsa/alanine-dipeptide.pdb')
-        pdbfile = PDBFile(pdb_filename)
-        self.topology = pdbfile.getTopology()
-        self.positions = pdbfile.getPositions(asNumpy=True)
-        forcefield = app.ForceField('amber99sbildn.xml')
-        self.system = forcefield.createSystem(self.topology, nonbondedMethod=app.NoCutoff, implicitSolvent=None, constraints=app.HBonds)
+        from openmmtools.testsystems import AlanineDipeptideVacuum
+        testsystem = AlanineDipeptideVacuum()
+        self.topology = testsystem.topology
+        self.positions = testsystem.positions
+        self.system = testsystem.system
 
         # Create thermodynamic states.
         Tmin = 270 * unit.kelvin
@@ -130,8 +127,76 @@ class AlanineDipeptideVacuumSimulatedTempering(SAMSTestSystem):
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
 
+class AlanineDipeptideExplicitSimulatedTempering(SAMSTestSystem):
+    """
+    Simulated tempering for alanine dipeptide in explicit solvent.
+
+    Properties
+    ----------
+    topology : simtk.openmm.app.Topology
+        The system Topology
+    system : simtk.openmm.System
+        The OpenMM System to simulate
+    positions : simtk.unit.Quantity of [nparticles,3] with units compatible with nanometers
+        Initial positions
+    thermodynamic_states : list of ThermodynamicState
+        List of thermodynamic states to be used in expanded ensemble sampling
+
+    Examples
+    --------
+
+    >>> from sams.tests.testsystems import AlanineDipeptideExplicitSimulatedTempering
+    >>> testsystem = AlanineDipeptideExplicitSimulatedTempering()
+
+    """
+    def __init__(self):
+        super(AlanineDipeptideExplicitSimulatedTempering, self).__init__()
+        self.description = 'Alanine dipeptide in explicit solvent simulated tempering simulation'
+
+        # Create topology, positions, and system.
+        from openmmtools.testsystems import AlanineDipeptideExplicit
+        testsystem = AlanineDipeptideExplicit(nonbondedMethod=app.CutoffPeriodic)
+        self.topology = testsystem.topology
+        self.positions = testsystem.positions
+        self.system = testsystem.system
+
+        # Create thermodynamic states.
+        Tmin = 270 * unit.kelvin
+        Tmax = 600 * unit.kelvin
+        ntemps = 32 # number of temperatures
+        from sams import ThermodynamicState
+        temperatures = unit.Quantity(np.logspace(np.log10(Tmin / unit.kelvin), np.log10(Tmax / unit.kelvin), ntemps), unit.kelvin)
+        self.thermodynamic_states = [ ThermodynamicState(system=self.system, temperature=temperature) for temperature in temperatures ]
+
+        # Create SAMS samplers
+        from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
+        thermodynamic_state_index = 0 # initial thermodynamic state index
+        thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
+        sampler_state = SamplerState(positions=self.positions)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state)
+        self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
+        self.mcmc_sampler.topology = self.topology
+        self.mcmc_sampler.nsteps = 50 # reduce number of steps for testing
+        self.mcmc_sampler.verbose = True
+        self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
+        self.exen_sampler.verbose = True
+        self.sams_sampler = SAMSSampler(self.exen_sampler)
+        self.sams_sampler.verbose = True
+
 def test_testsystems():
-    test = AlanineDipeptideVacuumSimulatedTempering()
-    test.mcmc_sampler.run(10)
-    test.exen_sampler.run(10)
-    test.sams_sampler.run(10)
+    np.set_printoptions(linewidth=130, precision=3)
+    # TODO: Automatically discover subclasses of SAMSTestSystem
+    niterations = 5
+    import sams
+    for testsystem_name in ['AlanineDipeptideVacuumSimulatedTempering', 'AlanineDipeptideExplicitSimulatedTempering']:
+        testsystem = getattr(sams.tests.testsystems, testsystem_name)
+        test = testsystem()
+        f = partial(test.mcmc_sampler.run, niterations)
+        f.description = 'Testing ' + test.description + ' MCMC simulation'
+        yield f
+        f = partial(test.exen_sampler.run, niterations)
+        f.description = 'Testing ' + test.description + ' expanded ensemble simulation'
+        yield f
+        f = partial(test.sams_sampler.run, niterations)
+        f.description = 'Testing ' + test.description + ' SAMS simulation'
+        yield f
