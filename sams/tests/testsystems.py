@@ -39,6 +39,35 @@ from openmmtools import testsystems
 ################################################################################
 
 ################################################################################
+# SUBROUTINES
+################################################################################
+
+def minimize(testsystem):
+    """
+    Minimize all structures in test system.
+
+    Parameters
+    ----------
+    testystem : PersesTestSystem
+        The testsystem to minimize.
+
+    """
+    print("Minimizing '%s'..." % testsystem.description)
+    integrator = openmm.VerletIntegrator(1.0 * unit.femtoseconds)
+    context = openmm.Context(testsystem.system, integrator)
+    context.setPositions(testsystem.positions)
+    print ("Initial energy is %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    TOL = 1.0
+    MAX_STEPS = 500
+    openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
+    print ("Final energy is   %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    # Update positions.
+    testsystem.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
+    testsystem.mcmc_sampler.sampler_state.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
+    # Clean up.
+    del context, integrator
+
+################################################################################
 # TEST SYSTEMS
 ################################################################################
 
@@ -414,6 +443,9 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         self.exen_sampler.verbose = True
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
+
+        # This test case requires minimization to not explode.
+        minimize(self)
 
 def test_testsystems():
     np.set_printoptions(linewidth=130, precision=3)
