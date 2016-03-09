@@ -322,12 +322,105 @@ class AlanineDipeptideExplicitAlchemical(SAMSTestSystem):
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
 
+class AblImatinibExplicitAlchemical(SAMSTestSystem):
+    """
+    Alchemical free energy calculation for Abl:imatinib in explicit solvent.
+
+    Properties
+    ----------
+    topology : simtk.openmm.app.Topology
+        The system Topology
+    system : simtk.openmm.System
+        The OpenMM System to simulate
+    positions : simtk.unit.Quantity of [nparticles,3] with units compatible with nanometers
+        Initial positions
+    thermodynamic_states : list of ThermodynamicState
+        List of thermodynamic states to be used in expanded ensemble sampling
+
+    Examples
+    --------
+
+    >>> from sams.tests.testsystems import AblImatinibExplicitAlchemical
+    >>> testsystem = AblImatinibExplicitAlchemical()
+
+    """
+    def __init__(self):
+        super(AblImatinibExplicitAlchemical, self).__init__()
+        self.description = 'Abl:imatinib in explicit solvent alchemical free energy calculation'
+
+        padding = 9.0*unit.angstrom
+        explicit_solvent_model = 'tip3p'
+        setup_path = 'data/abl-imatinib'
+
+        # Create topology, positions, and system.
+        from pkg_resources import resource_filename
+        gaff_xml_filename = resource_filename('sams', 'data/gaff.xml')
+        imatinib_xml_filename = resource_filename('sams', 'data/abl-imatinib/imatinib.xml')
+        system_generators = dict()
+        ffxmls = [gaff_xml_filename, imatinib_xml_filename, 'amber99sbildn.xml', 'tip3p.xml']
+        forcefield_kwargs={ 'nonbondedMethod' : app.CutoffPeriodic, 'nonbondedCutoff' : 9.0 * unit.angstrom, 'implicitSolvent' : None, 'constraints' : app.HBonds }
+
+        # Load topologies and positions for all components
+        print('Creating Abl:imatinib test system...')
+        forcefield = app.ForceField(*ffxmls)
+        from simtk.openmm.app import PDBFile, Modeller
+        pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'complex'))
+        pdbfile = PDBFile(pdb_filename)
+        modeller = app.Modeller(pdbfile.topology, pdbfile.positions)
+        print('Adding solvent...')
+        modeller.addSolvent(forcefield, model=explicit_solvent_model, padding=padding)
+        self.topology = modeller.getTopology()
+        self.positions = modeller.getPositions()
+        print('Creating system...')
+        self.system = forcefield.createSystem(self.topology, **forcefield_kwargs)
+
+        # Add a MonteCarloBarostat
+        #temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
+        #pressure = 1.0 * unit.atmospheres
+        #barostat = openmm.MonteCarloBarostat(pressure, temperature)
+        #self.system.addForce(barostat)
+
+        # Create thermodynamic states.
+        print('Creating alchemically-modified system...')
+        temperature = 300 * unit.kelvin
+        pressure = 1.0 * unit.atmospheres
+        alchemical_atoms = range(4266,4335) # alanine dipeptide
+        from alchemy import AbsoluteAlchemicalFactory
+        factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False)
+        self.system = factory.createPerturbedSystem()
+        print('Setting up alchemical intermediates...')
+        nlambda = 512 # number of alchemical intermediates
+        from sams import ThermodynamicState
+        alchemical_lambdas = np.linspace(1.0, 0.0, nlambda)
+        self.thermodynamic_states = list()
+        for alchemical_lambda in alchemical_lambdas:
+            parameters = {'lambda_sterics' : alchemical_lambda, 'lambda_electrostatics' : alchemical_lambda}
+            #parameters = {'lambda_electrostatics' : alchemical_lambda}
+            #self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, pressure=pressure, parameters=parameters) )
+            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+
+        # Create SAMS samplers
+        print('Setting up samplers...')
+        from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
+        thermodynamic_state_index = 0 # initial thermodynamic state index
+        thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
+        sampler_state = SamplerState(positions=self.positions)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state)
+        self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
+        self.mcmc_sampler.topology = self.topology
+        self.mcmc_sampler.nsteps = 50 # reduce number of steps for testing
+        self.mcmc_sampler.verbose = True
+        self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
+        self.exen_sampler.verbose = True
+        self.sams_sampler = SAMSSampler(self.exen_sampler)
+        self.sams_sampler.verbose = True
+
 def test_testsystems():
     np.set_printoptions(linewidth=130, precision=3)
     # TODO: Automatically discover subclasses of SAMSTestSystem
     niterations = 5
     import sams
-    for testsystem_name in ['AlanineDipeptideVacuumSimulatedTempering', 'AlanineDipeptideExplicitSimulatedTempering', 'AlanineDipeptideVacuumAlchemical', 'AlanineDipeptideExplicitAlchemical']:
+    for testsystem_name in ['AblImatinibExplicitAlchemical', 'AlanineDipeptideVacuumSimulatedTempering', 'AlanineDipeptideExplicitSimulatedTempering', 'AlanineDipeptideVacuumAlchemical', 'AlanineDipeptideExplicitAlchemical']:
         testsystem = getattr(sams.tests.testsystems, testsystem_name)
         test = testsystem()
         f = partial(test.mcmc_sampler.run, niterations)
@@ -340,11 +433,31 @@ def test_testsystems():
         f.description = 'Testing ' + test.description + ' SAMS simulation'
         yield f
 
+def generate_ffxml(pdb_filename):
+    from simtk.openmm.app import PDBFile, Modeller
+    pdbfile = PDBFile(pdb_filename)
+    residues = [ residue for residue in pdbfile.topology.residues() ]
+    residue = residues[0]
+    from openmoltools.forcefield_generators import generateForceFieldFromMolecules, generateOEMolFromTopologyResidue
+    molecule = generateOEMolFromTopologyResidue(residue, geometry=False, tripos_atom_names=True)
+    molecule.SetTitle('MOL')
+    molecules = [molecule]
+    ffxml = generateForceFieldFromMolecules(molecules)
+    outfile = open('imatinib.xml', 'w')
+    outfile.write(ffxml)
+    outfile.close()
+
+
 if __name__ == '__main__':
-    testsystem = AlanineDipeptideExplicitAlchemical()
+    #pdb_filename = resource_filename('sams', os.path.join('data', 'abl-imatinib', 'inhibitor.pdb'))
+    #generate_ffxml(pdb_filename)
+    #stop
+
+    testsystem = AblImatinibExplicitAlchemical()
+    #testsystem = AlanineDipeptideExplicitAlchemical()
     niterations = 1000
     testsystem.mcmc_sampler.nsteps = 50
     testsystem.mcmc_sampler.pdbfile = None
     testsystem.exen_sampler.update_scheme = 'local'
-    testsystem.exen_sampler.locality = 5    
+    testsystem.exen_sampler.locality = 5
     testsystem.sams_sampler.run(niterations)

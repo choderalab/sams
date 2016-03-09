@@ -89,7 +89,7 @@ class ThermodynamicState(object):
     `ThermodynamicState` cannot describe states obeying non-Boltzamnn statistics, such as Tsallis statistics.
 
     """
-    def __init__(self, system, temperature, pressure=None, parameters=None):
+    def __init__(self, system, temperature, pressure=None, parameters=None, check_parameters=False):
         """Construct a thermodynamic state with given system and temperature.
 
         Parameters
@@ -104,6 +104,8 @@ class ThermodynamicState(object):
             If not None, specifies the pressure for constant-pressure systems.
         parameters : dict, optional, default=None
             parameters[name] is the context parameter value corresponding to parameter `name`, or `None` if no parameters are defined
+        check_parameters : bool, optional, default=False
+            If True, check that all parameters are present.
 
         """
         # Check input parameters
@@ -111,7 +113,7 @@ class ThermodynamicState(object):
             raise Exception('system must be specified')
         if temperature is None:
             raise Exception('temperature must be specified')
-        if parameters:
+        if parameters and check_parameters:
             platform = openmm.Platform.getPlatformByName('Reference')
             integrator = openmm.VerletIntegrator(1.0*unit.femtoseconds)
             context = openmm.Context(system, integrator, platform)
