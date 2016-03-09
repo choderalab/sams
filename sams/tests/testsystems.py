@@ -285,10 +285,10 @@ class AlanineDipeptideExplicitAlchemical(SAMSTestSystem):
         self.system = testsystem.system
 
         # Add a MonteCarloBarostat
-        temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
-        pressure = 1.0 * unit.atmospheres
-        barostat = openmm.MonteCarloBarostat(pressure, temperature)
-        self.system.addForce(barostat)
+        #temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
+        #pressure = 1.0 * unit.atmospheres
+        #barostat = openmm.MonteCarloBarostat(pressure, temperature)
+        #self.system.addForce(barostat)
 
         # Create thermodynamic states.
         temperature = 300 * unit.kelvin
@@ -297,13 +297,15 @@ class AlanineDipeptideExplicitAlchemical(SAMSTestSystem):
         from alchemy import AbsoluteAlchemicalFactory
         factory = AbsoluteAlchemicalFactory(testsystem.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False)
         self.system = factory.createPerturbedSystem()
-        nlambda = 32 # number of alchemical intermediates
+        nlambda = 512 # number of alchemical intermediates
         from sams import ThermodynamicState
         alchemical_lambdas = np.linspace(1.0, 0.0, nlambda)
         self.thermodynamic_states = list()
         for alchemical_lambda in alchemical_lambdas:
             parameters = {'lambda_sterics' : alchemical_lambda, 'lambda_electrostatics' : alchemical_lambda}
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, pressure=pressure, parameters=parameters) )
+            #parameters = {'lambda_electrostatics' : alchemical_lambda}
+            #self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, pressure=pressure, parameters=parameters) )
+            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
 
         # Create SAMS samplers
         from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
@@ -341,4 +343,8 @@ def test_testsystems():
 if __name__ == '__main__':
     testsystem = AlanineDipeptideExplicitAlchemical()
     niterations = 1000
+    testsystem.mcmc_sampler.nsteps = 50
+    testsystem.mcmc_sampler.pdbfile = None
+    testsystem.exen_sampler.update_scheme = 'local'
+    testsystem.exen_sampler.locality = 5    
     testsystem.sams_sampler.run(niterations)

@@ -460,7 +460,7 @@ class MCMCSampler(object):
         self.topology = None
 
         # Create an integrator
-        integrator_name = 'GHMC'
+        integrator_name = 'Langevin'
         if integrator_name == 'GHMC':
             from openmmtools.integrators import GHMCIntegrator
             self.integrator = GHMCIntegrator(temperature=self.thermodynamic_state.temperature, collision_rate=self.collision_rate, timestep=self.timestep)
@@ -634,7 +634,7 @@ class ExpandedEnsembleSampler(object):
         # Compute unnormalized log probabilities for all thermodynamic states
         log_P_k = np.zeros([len(neighborhood)], np.float64)
         for (neighborhood_index, state_index) in enumerate(neighborhood):
-                log_P_k[neighborhood_index] = self.log_weights[state_index] - self.thermodynamic_states[state_index].reduced_potential(self.sampler.context)
+            log_P_k[neighborhood_index] = self.log_weights[state_index] - self.thermodynamic_states[state_index].reduced_potential(self.sampler.context)
         log_P_k -= logsumexp(log_P_k)
         # Update thermodynamic state index
         P_k = np.exp(log_P_k)
@@ -647,8 +647,8 @@ class ExpandedEnsembleSampler(object):
 
         if self.verbose:
             print('Current thermodynamic state index is %d' % self.thermodynamic_state_index)
-            print('log_P_k for neighborhood %s ' % neighborhood)
-            print(log_P_k)
+            Neff = (P_k / P_k.max()).sum()
+            print('Effective number of states with probability: %10.5f' % Neff)
 
         # Update statistics.
         self.update_statistics()
@@ -719,7 +719,8 @@ class SAMSSampler(object):
     --------
 
     """
-    def __init__(self, sampler, logZ=None, log_target_probabilities=None, update_method='optimal', adapt_target_probabilities=False):
+    def __init__(self, sampler, logZ=None, log_target_probabilities=None, update_method='rao-blackwellized', adapt_target_probabilities=False,
+        guess_logZ=True):
         """
         Create a SAMS Sampler.
 
@@ -735,6 +736,8 @@ class SAMSSampler(object):
             SAMS update algorithm. One of ['optimal', 'rao-blackwellized']
         adapt_target_probabilities : bool, optional, default=False
             If True, target probabilities will be adapted to achieve minimal thermodynamic length between terminal thermodynamic states.
+        guess_logZ : bool, optional, default=False
+            If True, will attempt to guess initial logZ from energies of initial snapshot in all thermodynamic states.
 
         """
         # Check input arguments.
@@ -761,6 +764,16 @@ class SAMSSampler(object):
         if adapt_target_probabilities:
             raise Exception('Not implemented yet.')
 
+        if guess_logZ:
+            self.guess_logZ()
+
+    def guess_logZ(self):
+        # Compute guess of all energies.
+        for state_index in range(self.sampler.nstates):
+            self.logZ[state_index] = - self.sampler.thermodynamic_states[state_index].reduced_potential(self.sampler.sampler.context)
+        # Restore thermodynamic state.
+        self.sampler.thermodynamic_states[self.sampler.thermodynamic_state_index].update_context(self.sampler.sampler.context)
+
     def update_sampler(self):
         """
         Update the underlying expanded ensembles sampler.
@@ -773,17 +786,17 @@ class SAMSSampler(object):
         """
         if self.update_method == 'optimal':
             # Based on Eq. 9 of Ref. [1]
-            gamma = 1.0 / float(self.iteration+1)
+            gamma = min(1.0 / float(self.iteration+1), 1.0/self.sampler.nstates)
             current_state = self.sampler.thermodynamic_state_index
             log_pi_k = self.log_target_probabilities
             self.logZ[current_state] += gamma * np.exp(-log_pi_k[current_state])
         elif self.update_method == 'rao-blackwellized':
             # Based on Eq. 12 of Ref [1]
-            gamma = 1.0 / float(self.iteration+1)
+            gamma = min(1.0 / float(self.iteration+1), 1.0/self.sampler.nstates)
             neighborhood = self.sampler.neighborhood # indices of states for expanded ensemble update
             log_P_k = self.sampler.log_P_k # log probabilities of selecting states in neighborhood during update
             log_pi_k = self.log_target_probabilities
-            self.logZ[neighborhood] += gamma * np.exp(log_P_k[neighborhood] - log_pi_k[neighborhood])
+            self.logZ[neighborhood] += gamma * np.exp(log_P_k - log_pi_k[neighborhood])
         else:
             raise Exception("SAMS update method '%s' unknown." % self.update_method)
 
