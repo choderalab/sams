@@ -53,14 +53,20 @@ def minimize(testsystem):
 
     """
     print("Minimizing '%s'..." % testsystem.description)
-    integrator = openmm.VerletIntegrator(1.0 * unit.femtoseconds)
+    collision_rate = 20.0 / unit.picoseconds
+    temperature = 300 * unit.kelvin
+    integrator = openmm.LangevinIntegrator(1.0 * unit.femtoseconds, collision_rate, temperature)
     context = openmm.Context(testsystem.system, integrator)
     context.setPositions(testsystem.positions)
     print ("Initial energy is %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     TOL = 1.0
-    MAX_STEPS = 500
+    MAX_STEPS = 100
     openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
     print ("Final energy is   %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    # Take some steps.
+    nsteps = 500
+    integrator.step(nsteps)
+    print ("After %d steps    %12.3f kcal/mol" % (nsteps, context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     # Update positions.
     testsystem.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
     testsystem.mcmc_sampler.sampler_state.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
@@ -387,13 +393,14 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         imatinib_xml_filename = resource_filename('sams', 'data/abl-imatinib/imatinib.xml')
         system_generators = dict()
         ffxmls = [gaff_xml_filename, imatinib_xml_filename, 'amber99sbildn.xml', 'tip3p.xml']
-        forcefield_kwargs={ 'nonbondedMethod' : app.CutoffPeriodic, 'nonbondedCutoff' : 9.0 * unit.angstrom, 'implicitSolvent' : None, 'constraints' : app.HBonds }
+        forcefield_kwargs={ 'nonbondedMethod' : app.CutoffPeriodic, 'nonbondedCutoff' : 9.0 * unit.angstrom, 'implicitSolvent' : None, 'constraints' : app.HBonds, 'rigidWater' : True }
 
         # Load topologies and positions for all components
         print('Creating Abl:imatinib test system...')
         forcefield = app.ForceField(*ffxmls)
         from simtk.openmm.app import PDBFile, Modeller
-        pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'complex'))
+        pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'inhibitor'))
+        #pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'complex'))
         pdbfile = PDBFile(pdb_filename)
         modeller = app.Modeller(pdbfile.topology, pdbfile.positions)
         print('Adding solvent...')
@@ -413,7 +420,8 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         print('Creating alchemically-modified system...')
         temperature = 300 * unit.kelvin
         pressure = 1.0 * unit.atmospheres
-        alchemical_atoms = range(4266,4335) # alanine dipeptide
+        #alchemical_atoms = range(4266,4335) # Abl:imatinib
+        alchemical_atoms = range(0,69) # Abl:imatinib
         from alchemy import AbsoluteAlchemicalFactory
         factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False)
         self.system = factory.createPerturbedSystem()
@@ -445,7 +453,7 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         self.sams_sampler.verbose = True
 
         # This test case requires minimization to not explode.
-        minimize(self)
+        #minimize(self)
 
 def test_testsystems():
     np.set_printoptions(linewidth=130, precision=3)

@@ -721,7 +721,7 @@ class SAMSSampler(object):
     --------
 
     """
-    def __init__(self, sampler, logZ=None, log_target_probabilities=None, update_method='rao-blackwellized', adapt_target_probabilities=False,
+    def __init__(self, sampler, logZ=None, log_target_probabilities=None, update_stages='two-stage-all-visited', update_method='rao-blackwellized', adapt_target_probabilities=False,
         guess_logZ=True):
         """
         Create a SAMS Sampler.
@@ -734,6 +734,8 @@ class SAMSSampler(object):
             If specified, the log partition functions for each state will be initialized to the specified dictionary.
         log_target_probabilities : dict of key : float, optional, default=None
             If specified, unnormalized target probabilities; default is all 0.
+        update_stages : str, optional, default='two-stage'
+            Number of stages to use for update. One of ['one-stage', 'two-stage', 'two-stage-all-visited']
         update_method : str, optional, default='optimal'
             SAMS update algorithm. One of ['optimal', 'rao-blackwellized']
         adapt_target_probabilities : bool, optional, default=False
@@ -751,6 +753,7 @@ class SAMSSampler(object):
         self.sampler = sampler
         self.logZ = logZ
         self.log_target_probabilities = log_target_probabilities
+        self.update_stages = update_stages
         self.update_method = update_method
 
         if self.logZ is None:
@@ -786,6 +789,24 @@ class SAMSSampler(object):
         """
         Update the logZ estimates according to selected SAMS update method.
         """
+        if self.update_stages == 'one-stage':
+            gamma = 1.0 / float(self.iteration+1)
+        elif self.update_stages == 'two-stage':
+            gamma = min(1.0 / float(self.iteration+1), 1.0/self.sampler.nstates)
+        elif self.update_stages == 'two-stage-all-visited':
+            gamma = 1.0
+            if hasattr(self, 'second_stage_iteration_start'):
+                # We flattened at iteration t0. Use this to compute gamma
+                t0 = self.second_stage_iteration_start
+                gamma = 1.0 / float(self.iteration - t0 + 1)
+            else:
+                # Check if we have visited all states yet.
+                N_k = self.sampler.number_of_state_visits[:]
+                if np.all(N_k > 0):
+                    self.second_stage_iteration_start = self.iteration
+        else:
+            raise Exception("update_stages method '%s' unknown" % self.update_stages)
+
         if self.update_method == 'optimal':
             # Based on Eq. 9 of Ref. [1]
             gamma = min(1.0 / float(self.iteration+1), 1.0/self.sampler.nstates)
@@ -794,7 +815,6 @@ class SAMSSampler(object):
             self.logZ[current_state] += gamma * np.exp(-log_pi_k[current_state])
         elif self.update_method == 'rao-blackwellized':
             # Based on Eq. 12 of Ref [1]
-            gamma = min(1.0 / float(self.iteration+1), 1.0/self.sampler.nstates)
             neighborhood = self.sampler.neighborhood # indices of states for expanded ensemble update
             log_P_k = self.sampler.log_P_k # log probabilities of selecting states in neighborhood during update
             log_pi_k = self.log_target_probabilities
