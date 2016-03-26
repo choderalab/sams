@@ -423,18 +423,22 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         #alchemical_atoms = range(4266,4335) # Abl:imatinib
         alchemical_atoms = range(0,69) # Abl:imatinib
         from alchemy import AbsoluteAlchemicalFactory
-        factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False)
+        factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
         self.system = factory.createPerturbedSystem()
         print('Setting up alchemical intermediates...')
-        nlambda = 512 # number of alchemical intermediates
         from sams import ThermodynamicState
-        alchemical_lambdas = np.linspace(1.0, 0.0, nlambda)
         self.thermodynamic_states = list()
-        for alchemical_lambda in alchemical_lambdas:
-            parameters = {'lambda_sterics' : alchemical_lambda, 'lambda_electrostatics' : alchemical_lambda}
-            #parameters = {'lambda_electrostatics' : alchemical_lambda}
-            #self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, pressure=pressure, parameters=parameters) )
+        for state in range(251):
+            parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/250.0) }
             self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+        for state in range(1,251):
+            parameters = {'lambda_sterics' : (1.0 - float(state)/250.0), 'lambda_electrostatics' : 0.0 }
+            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+
+        # Create storage file
+        import netCDF4
+        ncfilename = 'output.nc'
+        self.ncfile = netCDF4.Dataset(ncfilename, mode='w')
 
         # Create SAMS samplers
         print('Setting up samplers...')
@@ -442,7 +446,7 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         thermodynamic_state_index = 0 # initial thermodynamic state index
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
         sampler_state = SamplerState(positions=self.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
         self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
         self.mcmc_sampler.nsteps = 50 # reduce number of steps for testing
@@ -495,7 +499,7 @@ if __name__ == '__main__':
 
     testsystem = AblImatinibExplicitAlchemical()
     #testsystem = AlanineDipeptideExplicitAlchemical()
-    niterations = 1000
+    niterations = 10000
     testsystem.mcmc_sampler.nsteps = 50
     testsystem.mcmc_sampler.pdbfile = None
     testsystem.exen_sampler.update_scheme = 'local'

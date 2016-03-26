@@ -428,7 +428,7 @@ class MCMCSampler(object):
     >>> sampler.run()
 
     """
-    def __init__(self, thermodynamic_state=None, sampler_state=None, platform=None):
+    def __init__(self, thermodynamic_state=None, sampler_state=None, platform=None, ncfile=None):
         """
         Create an MCMC sampler.
 
@@ -440,6 +440,8 @@ class MCMCSampler(object):
             The initial sampler state to simulate from.
         platform : simtk.openmm.Platform, optional, default=None
             If specified, this platform will be used
+        ncfile : netCDF4.Dataset, optional, default=None
+            NetCDF storage file.
 
         """
         if thermodynamic_state is None:
@@ -481,6 +483,21 @@ class MCMCSampler(object):
         self.sampler_state.update_context(self.context)
         self.context.setVelocitiesToTemperature(self.thermodynamic_state.temperature)
 
+        self._initializeNetCDF(ncfile)
+
+    def _initializeNetCDF(self, ncfile):
+        self.ncfile = ncfile
+        if self.ncfile == None:
+            return
+
+        natoms = self.thermodynamic_state.system.getNumParticles()
+        self.ncfile.createDimension('iterations', None)
+        self.ncfile.createDimension('atoms', natoms) # TODO: What do we do if dimension can change?
+        self.ncfile.createDimension('spatial', 3)
+
+        self.ncfile.createVariable('positions', 'f4', dimensions=('iterations', 'atoms', 'spatial'), zlib=True, chunksizes=(1,natoms,3))
+        self.ncfile.createVariable('potential', 'f8', dimensions=('iterations',), chunksizes=(1,))
+
     def update(self):
         """
         Update the sampler with one step of sampling.
@@ -508,6 +525,11 @@ class MCMCSampler(object):
         if self.verbose:
             final_energy = self.context.getState(getEnergy=True).getPotentialEnergy() * self.thermodynamic_state.beta
             print('Final energy is %12.3f kT' % (final_energy))
+
+        if self.ncfile:
+            self.ncfile.variables['positions'][self.iteration,:,:] = self.sampler_state.positions[:,:] / unit.angstroms
+            self.ncfile.variables['potential'][self.iteration] = self.thermodynamic_state.beta * self.context.getState(getEnergy=True).getPotentialEnergy()
+            self.ncfile.sync()
 
         # Increment iteration count
         self.iteration += 1
@@ -615,6 +637,17 @@ class ExpandedEnsembleSampler(object):
         self.number_of_state_visits = np.zeros([self.nstates], np.float64)
         self.verbose = False
 
+        self._initializeNetCDF(self.sampler.ncfile)
+
+    def _initializeNetCDF(self, ncfile):
+        self.ncfile = ncfile
+        if self.ncfile == None:
+            return
+
+        self.ncfile.createDimension('states', self.nstates)
+
+        self.ncfile.createVariable('state_index', 'i4', dimensions=('iterations',), chunksizes=(1,))
+
     def update_positions(self):
         """
         Sample new positions.
@@ -665,6 +698,11 @@ class ExpandedEnsembleSampler(object):
 
         self.update_positions()
         self.update_state()
+
+        if self.ncfile:
+            self.ncfile.variables['state_index'][self.iteration] = self.thermodynamic_state_index
+            self.ncfile.sync()
+
         self.iteration += 1
 
         if self.verbose:
@@ -772,6 +810,17 @@ class SAMSSampler(object):
         if guess_logZ:
             self.guess_logZ()
 
+        self._initializeNetCDF(self.sampler.ncfile)
+
+    def _initializeNetCDF(self, ncfile):
+        self.ncfile = ncfile
+        if self.ncfile == None:
+            return
+
+        nstates = self.sampler.nstates
+        self.ncfile.createVariable('logZ', 'f4', dimensions=('iterations', 'states'), zlib=True, chunksizes=(1,nstates))
+        self.ncfile.createVariable('log_target_probabilities', 'f4', dimensions=('iterations', 'states'), zlib=True, chunksizes=(1,nstates))
+
     def guess_logZ(self):
         # Compute guess of all energies.
         for state_index in range(self.sampler.nstates):
@@ -794,7 +843,7 @@ class SAMSSampler(object):
         elif self.update_stages == 'two-stage':
             gamma = min(1.0 / float(self.iteration+1), 1.0/self.sampler.nstates)
         elif self.update_stages == 'two-stage-all-visited':
-            gamma = 1.0
+            gamma = 1.0 / self.sampler.nstates
             if hasattr(self, 'second_stage_iteration_start'):
                 # We flattened at iteration t0. Use this to compute gamma
                 t0 = self.second_stage_iteration_start
@@ -841,6 +890,12 @@ class SAMSSampler(object):
             print("SAMS sampler iteration %5d" % self.iteration)
         self.update_sampler()
         self.update_logZ_estimates()
+
+        if self.ncfile:
+            self.ncfile.variables['logZ'][self.iteration,:] = self.logZ[:]
+            self.ncfile.variables['log_target_probabilities'][self.iteration,:] = self.log_target_probabilities[:]
+            self.ncfile.sync()
+
         self.iteration += 1
         if self.verbose:
             print("=" * 80)
