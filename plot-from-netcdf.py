@@ -3,14 +3,16 @@ import netCDF4
 
 ncfile = netCDF4.Dataset('output.nc', 'r')
 
-logZ = ncfile.variables['logZ'][-1,:]
+logZ = ncfile.variables['logZ'][-2,:]
 state_index = ncfile.variables['state_index'][:]
 
 nsamples = len(state_index)
 nstates = len(logZ)
 
-from matplotlib.backends.backend_pdf import PdfPages
+import matplotlib as mpl
+mpl.use('Agg')
 import matplotlib.pyplot as plt
+from matplotlib.backends.backend_pdf import PdfPages
 import seaborn
 
 with PdfPages('alchemy.pdf') as pdf:
