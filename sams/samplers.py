@@ -28,6 +28,7 @@ import os, os.path
 import sys, math
 import numpy as np
 import copy
+import time
 from scipy.misc import logsumexp
 
 from openmmtools import testsystems
@@ -483,6 +484,7 @@ class MCMCSampler(object):
         self.sampler_state.update_context(self.context)
         self.context.setVelocitiesToTemperature(self.thermodynamic_state.temperature)
 
+        self._timing = dict()
         self._initializeNetCDF(ncfile)
 
     def _initializeNetCDF(self, ncfile):
@@ -497,6 +499,7 @@ class MCMCSampler(object):
 
         self.ncfile.createVariable('positions', 'f4', dimensions=('iterations', 'atoms', 'spatial'), zlib=True, chunksizes=(1,natoms,3))
         self.ncfile.createVariable('potential', 'f8', dimensions=('iterations',), chunksizes=(1,))
+        self.ncfile.createVariable('sample_positions_time', 'f4', dimensions=('iterations',), chunksizes=(1,))
 
     def update(self):
         """
@@ -505,6 +508,8 @@ class MCMCSampler(object):
         if self.verbose:
             print("." * 80)
             print("MCMC sampler iteration %d" % self.iteration)
+
+        initial_time = time.time()
 
         # Reset statsitics
         if hasattr(self.integrator, 'setGlobalVariableByName'):
@@ -522,14 +527,19 @@ class MCMCSampler(object):
             fraction_accepted = float(naccept) / float(self.nsteps)
             if self.verbose: print("Accepted %d / %d GHMC steps (%.2f%%)." % (naccept, self.nsteps, fraction_accepted * 100))
 
+        final_time = time.time()
+        elapsed_time = final_time - initial_time
+        self._timing['sample positions'] = elapsed_time
+
         if self.verbose:
             final_energy = self.context.getState(getEnergy=True).getPotentialEnergy() * self.thermodynamic_state.beta
             print('Final energy is %12.3f kT' % (final_energy))
+            print('elapsed time %8.3f s' % elapsed_time)
 
         if self.ncfile:
             self.ncfile.variables['positions'][self.iteration,:,:] = self.sampler_state.positions[:,:] / unit.angstroms
             self.ncfile.variables['potential'][self.iteration] = self.thermodynamic_state.beta * self.context.getState(getEnergy=True).getPotentialEnergy()
-            self.ncfile.sync()
+            self.ncfile.variables['sample_positions_time'][self.iteration] = elapsed_time
 
         # Increment iteration count
         self.iteration += 1
@@ -637,6 +647,7 @@ class ExpandedEnsembleSampler(object):
         self.number_of_state_visits = np.zeros([self.nstates], np.float64)
         self.verbose = False
 
+        self._timing = self.sampler._timing
         self._initializeNetCDF(self.sampler.ncfile)
 
     def _initializeNetCDF(self, ncfile):
@@ -647,6 +658,7 @@ class ExpandedEnsembleSampler(object):
         self.ncfile.createDimension('states', self.nstates)
 
         self.ncfile.createVariable('state_index', 'i4', dimensions=('iterations',), chunksizes=(1,))
+        self.ncfile.createVariable('update_state_time', 'f4', dimensions=('iterations',), chunksizes=(1,))
 
     def update_positions(self):
         """
@@ -658,6 +670,8 @@ class ExpandedEnsembleSampler(object):
         """
         Sample the thermodynamic state.
         """
+        initial_time = time.time()
+
         state_index = self.thermodynamic_state_index
         if self.update_scheme == 'local':
             neighborhood = range(max(0, state_index - self.locality), min(self.nstates, state_index + self.locality))
@@ -685,6 +699,12 @@ class ExpandedEnsembleSampler(object):
             Neff = (P_k / P_k.max()).sum()
             print('Effective number of states with probability: %10.5f' % Neff)
 
+        # Update timing
+        final_time = time.time()
+        elapsed_time = final_time - initial_time
+        self._timing['update state time'] = elapsed_time
+        print('elapsed time %8.3f s' % elapsed_time)
+
         # Update statistics.
         self.update_statistics()
 
@@ -701,7 +721,7 @@ class ExpandedEnsembleSampler(object):
 
         if self.ncfile:
             self.ncfile.variables['state_index'][self.iteration] = self.thermodynamic_state_index
-            self.ncfile.sync()
+            self.ncfile.variables['update_state_time'][self.iteration] = self._timing['update state time']
 
         self.iteration += 1
 
@@ -725,9 +745,6 @@ class ExpandedEnsembleSampler(object):
         Update sampler statistics.
         """
         self.number_of_state_visits[self.thermodynamic_state_index] += 1.0
-        if self.verbose:
-            print('Number of times each state has been visited:')
-            print(self.number_of_state_visits)
 
 ################################################################################
 # SAMS SAMPLER
@@ -810,6 +827,7 @@ class SAMSSampler(object):
         if guess_logZ:
             self.guess_logZ()
 
+        self._timing = self.sampler._timing
         self._initializeNetCDF(self.sampler.ncfile)
 
     def _initializeNetCDF(self, ncfile):
@@ -821,6 +839,7 @@ class SAMSSampler(object):
         self.ncfile.createVariable('logZ', 'f4', dimensions=('iterations', 'states'), zlib=True, chunksizes=(1,nstates))
         self.ncfile.createVariable('logP_k', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
         self.ncfile.createVariable('log_target_probabilities', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
+        self.ncfile.createVariable('update_logZ_time', 'f4', dimensions=('iterations',), chunksizes=(1,))
 
     def guess_logZ(self):
         # Compute guess of all energies.
@@ -839,6 +858,8 @@ class SAMSSampler(object):
         """
         Update the logZ estimates according to selected SAMS update method.
         """
+        initial_time = time.time()
+
         gamma0 = 1.0 / self.sampler.nstates
         if self.update_stages == 'one-stage':
             gamma = gamma0 / float(self.iteration+1)
@@ -876,17 +897,20 @@ class SAMSSampler(object):
         # Subtract off logZ[0] to prevent logZ from growing without bound
         self.logZ -= self.logZ[0]
 
-        if self.verbose:
-            print('logZ')
-            print(self.logZ)
-
         # Update log weights for expanded ensemble sampler sampler
         self.sampler.log_weights[:] = - self.logZ[:]
+
+        final_time = time.time()
+        elapsed_time = final_time - initial_time
+        self._timing['update logZ time'] = elapsed_time
+        print('time elapsed %8.3f s' % elapsed_time)
 
     def update(self):
         """
         Update the sampler with one step of sampling.
         """
+        initial_time = time.time()
+
         if self.verbose:
             print("=" * 80)
             print("SAMS sampler iteration %5d" % self.iteration)
@@ -898,7 +922,13 @@ class SAMSSampler(object):
             self.ncfile.variables['logP_k'][self.iteration,:] = 0
             self.ncfile.variables['logP_k'][self.iteration,self.sampler.neighborhood] = self.sampler.log_P_k[:]
             self.ncfile.variables['log_target_probabilities'][self.iteration,:] = self.log_target_probabilities[:]
+            self.ncfile.variables['update_logZ_time'][self.iteration] = self._timing['update logZ time']
             self.ncfile.sync()
+
+        final_time = time.time()
+        elapsed_time = final_time - initial_time
+        self._timing['sams time'] = elapsed_time
+        print('total time   %8.3f s' % elapsed_time)
 
         self.iteration += 1
         if self.verbose:
