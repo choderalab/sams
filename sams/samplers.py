@@ -819,7 +819,8 @@ class SAMSSampler(object):
 
         nstates = self.sampler.nstates
         self.ncfile.createVariable('logZ', 'f4', dimensions=('iterations', 'states'), zlib=True, chunksizes=(1,nstates))
-        self.ncfile.createVariable('log_target_probabilities', 'f4', dimensions=('iterations', 'states'), zlib=True, chunksizes=(1,nstates))
+        self.ncfile.createVariable('logP_k', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
+        self.ncfile.createVariable('log_target_probabilities', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
 
     def guess_logZ(self):
         # Compute guess of all energies.
@@ -838,16 +839,17 @@ class SAMSSampler(object):
         """
         Update the logZ estimates according to selected SAMS update method.
         """
+        gamma0 = 1.0 / self.sampler.nstates
         if self.update_stages == 'one-stage':
-            gamma = 1.0 / float(self.iteration+1)
+            gamma = gamma0 / float(self.iteration+1)
         elif self.update_stages == 'two-stage':
-            gamma = min(1.0 / float(self.iteration+1), 1.0/self.sampler.nstates)
+            gamma = min(1.0 / float(self.iteration+1), gamma0)
         elif self.update_stages == 'two-stage-all-visited':
-            gamma = 1.0 / self.sampler.nstates
+            gamma = gamma0
             if hasattr(self, 'second_stage_iteration_start'):
                 # We flattened at iteration t0. Use this to compute gamma
                 t0 = self.second_stage_iteration_start
-                gamma = 1.0 / float(self.iteration - t0 + 1)
+                gamma = gamma0 / float(self.iteration - t0 + 1)
             else:
                 # Check if we have visited all states yet.
                 N_k = self.sampler.number_of_state_visits[:]
@@ -893,6 +895,8 @@ class SAMSSampler(object):
 
         if self.ncfile:
             self.ncfile.variables['logZ'][self.iteration,:] = self.logZ[:]
+            self.ncfile.variables['logP_k'][self.iteration,:] = 0
+            self.ncfile.variables['logP_k'][self.iteration,self.sampler.neighborhood] = self.sampler.log_P_k[:]
             self.ncfile.variables['log_target_probabilities'][self.iteration,:] = self.log_target_probabilities[:]
             self.ncfile.sync()
 

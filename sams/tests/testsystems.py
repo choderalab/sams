@@ -410,6 +410,11 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         print('Creating system...')
         self.system = forcefield.createSystem(self.topology, **forcefield_kwargs)
 
+        # DEBUG: Write PDB
+        outfile = open('initial.pdb', 'w')
+        PDBFile.writeFile(self.topology, self.positions, outfile)
+        outfile.close()
+
         # Add a MonteCarloBarostat
         #temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
         #pressure = 1.0 * unit.atmospheres
@@ -447,9 +452,9 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
         sampler_state = SamplerState(positions=self.positions)
         self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
-        self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
+        #self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
-        self.mcmc_sampler.nsteps = 50 # reduce number of steps for testing
+        self.mcmc_sampler.nsteps = 500 # reduce number of steps for testing
         self.mcmc_sampler.verbose = True
         self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
         self.exen_sampler.verbose = True
@@ -499,9 +504,9 @@ if __name__ == '__main__':
 
     testsystem = AblImatinibExplicitAlchemical()
     #testsystem = AlanineDipeptideExplicitAlchemical()
-    niterations = 10000
+    niterations = 2000
     testsystem.mcmc_sampler.nsteps = 50
     testsystem.mcmc_sampler.pdbfile = None
     testsystem.exen_sampler.update_scheme = 'local'
-    testsystem.exen_sampler.locality = 5
+    testsystem.exen_sampler.locality = 20
     testsystem.sams_sampler.run(niterations)
