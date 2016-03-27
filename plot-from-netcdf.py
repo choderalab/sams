@@ -23,7 +23,7 @@ with PdfPages('alchemy.pdf') as pdf:
 
     if hasattr(testsystem, 'logZ'):
         plt.hold(True)
-        plt.plot(testsystem.logZ, 'r-')
+        plt.plot(testsystem.logZ, 'ro')
         print testsystem.logZ
 
     logZ = ncfile.variables['logZ'][-2,:]
@@ -31,7 +31,9 @@ with PdfPages('alchemy.pdf') as pdf:
     plt.title(testsystem.description)
     plt.xlabel('state index')
     plt.ylabel('log Z estimate')
-    plt.axis([0, nstates-1, min(logZ), max(logZ)])
+    plt.axis([0, nstates-1, 0.0, max(logZ)])
+    if hasattr(testsystem, 'logZ'):
+        plt.axis([0, nstates-1, 0.0, max(testsystem.logZ)])
     pdf.savefig()  # saves the current figure into a pdf page
 
     # PAGE 2

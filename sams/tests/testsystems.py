@@ -137,7 +137,7 @@ class HarmonicOscillatorSimulatedTempering(SAMSTestSystem):
 
         # Create topology, positions, and system.
         from openmmtools.testsystems import HarmonicOscillator
-        K = 100.0 * unit.kilocalories_per_mole / unit.angstroms**2 # 3D harmonic oscillator spring constant
+        K = 1.0 * unit.kilocalories_per_mole / unit.angstroms**2 # 3D harmonic oscillator spring constant
         mass = 39.948 * unit.amu # 3D harmonic oscillator particle mass
         period = 2.0 * np.pi * unit.sqrt(mass / K) # harmonic oscillator period
         timestep = 0.01 * period
@@ -154,6 +154,13 @@ class HarmonicOscillatorSimulatedTempering(SAMSTestSystem):
         temperatures = unit.Quantity(np.logspace(np.log10(Tmin / unit.kelvin), np.log10(Tmax / unit.kelvin), ntemps), unit.kelvin)
         self.thermodynamic_states = [ ThermodynamicState(system=self.system, temperature=temperature) for temperature in temperatures ]
 
+        # Compute analytical logZ for each thermodynamic state.
+        self.logZ = np.zeros([ntemps], np.float64)
+        for (index, thermodynamic_state) in enumerate(self.thermodynamic_states):
+            beta = thermodynamic_state.beta
+            self.logZ[index] = - 1.5 * np.log(beta * K * unit.angstrom**2)
+        self.logZ[:] -= self.logZ[0]
+
         # Create SAMS samplers
         from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
         thermodynamic_state_index = 0 # initial thermodynamic state index
@@ -163,20 +170,14 @@ class HarmonicOscillatorSimulatedTempering(SAMSTestSystem):
         self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
         self.mcmc_sampler.timestep = timestep
+        self.mcmc_sampler.collision_rate = 1.0 / (100 * timestep)
         self.mcmc_sampler.nsteps = 1000
         self.mcmc_sampler.verbose = True
         self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
         self.exen_sampler.verbose = True
-        self.sams_sampler = SAMSSampler(self.exen_sampler, update_stages='one-stage', update_method='rao-blackwellized')
+        self.sams_sampler = SAMSSampler(self.exen_sampler, update_stages='two-stage', update_method='rao-blackwellized')
         self.sams_sampler.verbose = True
 
-        # Compute analytical logZ for each thermodynamic state.
-        self.logZ = np.zeros([ntemps], np.float64)
-        for (index, thermodynamic_state) in enumerate(self.thermodynamic_states):
-            beta = thermodynamic_state.beta
-            sigma = 1.0 / unit.sqrt(beta * K)
-            self.logZ[index] = 1.5 * np.log(2*np.pi) + 3.0 * np.log(sigma / unit.angstrom)
-        self.logZ[:] -= self.logZ[0]
 
 class AlanineDipeptideVacuumSimulatedTempering(SAMSTestSystem):
     """

@@ -177,6 +177,8 @@ class ThermodynamicState(object):
     def reduced_potential(self, context, sampler_state=None):
         """Compute the reduced potential for the given sampler state.
 
+        WARNING: This does NOT return the context to the original state.
+
         Parameters
         ----------
         context : simtk.openmm.Context
@@ -224,14 +226,16 @@ class ThermodynamicState(object):
         # Compute potential energy.
         state = context.getState(getEnergy=True)
         potential_energy = state.getPotentialEnergy()
-        del state
 
         # Compute reduced potential.
         reduced_potential = self.beta * potential_energy
         if self.pressure is not None:
-            volume = context.getState().getPeriodicBoxVolume()
+            volume = state.getPeriodicBoxVolume()
             reduced_potential += self.beta * self.pressure * volume * unit.AVOGADRO_CONSTANT_NA
 
+        # TODO: Return Context to original form.
+
+        del state
         return reduced_potential
 
     @property
@@ -426,6 +430,7 @@ class MCMCSampler(object):
     >>> # Create an MCMC sampler
     >>> sampler = MCMCSampler(thermodynamic_state, sampler_state)
     >>> # Run the sampler
+    >>> sampler.verbose = False
     >>> sampler.run()
 
     """
@@ -486,7 +491,7 @@ class MCMCSampler(object):
             self.context = openmm.Context(self.thermodynamic_state.system, self.integrator, platform)
         else:
             self.context = openmm.Context(self.thermodynamic_state.system, self.integrator)
-        self.thermodynamic_state.update_context(self.context)
+        self.thermodynamic_state.update_context(self.context, self.integrator)
         self.sampler_state.update_context(self.context)
         self.context.setVelocitiesToTemperature(self.thermodynamic_state.temperature)
 
@@ -696,7 +701,7 @@ class ExpandedEnsembleSampler(object):
         # Update thermodynamic state index
         P_k = np.exp(log_P_k)
         self.thermodynamic_state_index = np.random.choice(neighborhood, p=P_k)
-        self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context)
+        self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
         # Store log probabilities for use by SAMS sampler.
         # TODO: Store this in NetCDF history instead
         self.neighborhood = neighborhood
@@ -784,7 +789,7 @@ class SAMSSampler(object):
     --------
 
     """
-    def __init__(self, sampler, logZ=None, log_target_probabilities=None, update_stages='two-stage-all-visited', update_method='rao-blackwellized', adapt_target_probabilities=False,
+    def __init__(self, sampler, logZ=None, log_target_probabilities=None, update_stages='two-stage', update_method='rao-blackwellized', adapt_target_probabilities=False,
         guess_logZ=False):
         """
         Create a SAMS Sampler.
@@ -798,7 +803,7 @@ class SAMSSampler(object):
         log_target_probabilities : dict of key : float, optional, default=None
             If specified, unnormalized target probabilities; default is all 0.
         update_stages : str, optional, default='two-stage'
-            Number of stages to use for update. One of ['one-stage', 'two-stage', 'two-stage-all-visited']
+            Number of stages to use for update. One of ['one-stage', 'two-stage']
         update_method : str, optional, default='optimal'
             SAMS update algorithm. One of ['optimal', 'rao-blackwellized']
         adapt_target_probabilities : bool, optional, default=False
@@ -854,7 +859,7 @@ class SAMSSampler(object):
         for state_index in range(self.sampler.nstates):
             self.logZ[state_index] = - self.sampler.thermodynamic_states[state_index].reduced_potential(self.sampler.sampler.context)
         # Restore thermodynamic state.
-        self.sampler.thermodynamic_states[self.sampler.thermodynamic_state_index].update_context(self.sampler.sampler.context)
+        self.sampler.thermodynamic_states[self.sampler.thermodynamic_state_index].update_context(self.sampler.sampler.context, self.sampler.integrator)
 
     def update_sampler(self):
         """
@@ -872,13 +877,11 @@ class SAMSSampler(object):
         if self.update_stages == 'one-stage':
             gamma = gamma0 / float(self.iteration+1)
         elif self.update_stages == 'two-stage':
-            gamma = min(1.0 / float(self.iteration+1), gamma0)
-        elif self.update_stages == 'two-stage-all-visited':
             gamma = gamma0
             if hasattr(self, 'second_stage_iteration_start'):
                 # We flattened at iteration t0. Use this to compute gamma
                 t0 = self.second_stage_iteration_start
-                gamma = gamma0 / float(self.iteration - t0 + 1)
+                gamma = 1.0 / float(self.iteration - t0 + 1./gamma0)
             else:
                 # Check if we have visited all states yet.
                 N_k = self.sampler.number_of_state_visits[:]
@@ -889,7 +892,6 @@ class SAMSSampler(object):
 
         if self.update_method == 'optimal':
             # Based on Eq. 9 of Ref. [1]
-            gamma = min(1.0 / float(self.iteration+1), 1.0/self.sampler.nstates)
             current_state = self.sampler.thermodynamic_state_index
             log_pi_k = self.log_target_probabilities
             self.logZ[current_state] += gamma * np.exp(-log_pi_k[current_state])
@@ -903,10 +905,10 @@ class SAMSSampler(object):
             raise Exception("SAMS update method '%s' unknown." % self.update_method)
 
         # Subtract off logZ[0] to prevent logZ from growing without bound
-        self.logZ -= self.logZ[0]
+        self.logZ[:] -= self.logZ[0]
 
         # Update log weights for expanded ensemble sampler sampler
-        self.sampler.log_weights[:] = - self.logZ[:]
+        self.sampler.log_weights[:] = self.log_target_probabilities[:] - self.logZ[:]
 
         final_time = time.time()
         elapsed_time = final_time - initial_time
