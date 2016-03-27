@@ -103,8 +103,80 @@ class SAMSTestSystem(object):
         SAMSSampler objects for environments
 
     """
-    def __init__(self):
-        pass
+    def __init__(self, netcdf_filename=None):
+        import netCDF4
+        self.ncfile = None
+        if netcdf_filename is not None:
+            self.ncfile = netCDF4.Dataset(netcdf_filename, mode='w')
+
+class HarmonicOscillatorSimulatedTempering(SAMSTestSystem):
+    """
+    Similated tempering for 3D harmonic oscillator.
+
+    Properties
+    ----------
+    topology : simtk.openmm.app.Topology
+        The system Topology
+    system : simtk.openmm.System
+        The OpenMM System to simulate
+    positions : simtk.unit.Quantity of [nparticles,3] with units compatible with nanometers
+        Initial positions
+    thermodynamic_states : list of ThermodynamicState
+        List of thermodynamic states to be used in expanded ensemble sampling
+
+    Examples
+    --------
+
+    >>> from sams.tests.testsystems import HarmonicOscillatorSimulatedTempering
+    >>> testsystem = HarmonicOscillatorSimulatedTempering()
+
+    """
+    def __init__(self, **kwargs):
+        super(HarmonicOscillatorSimulatedTempering, self).__init__(**kwargs)
+        self.description = 'Harmonic oscillator simulated tempering simulation'
+
+        # Create topology, positions, and system.
+        from openmmtools.testsystems import HarmonicOscillator
+        K = 100.0 * unit.kilocalories_per_mole / unit.angstroms**2 # 3D harmonic oscillator spring constant
+        mass = 39.948 * unit.amu # 3D harmonic oscillator particle mass
+        period = 2.0 * np.pi * unit.sqrt(mass / K) # harmonic oscillator period
+        timestep = 0.01 * period
+        testsystem = HarmonicOscillator(K=K, mass=mass)
+        self.topology = testsystem.topology
+        self.positions = testsystem.positions
+        self.system = testsystem.system
+
+        # Create thermodynamic states.
+        Tmin = 100 * unit.kelvin
+        Tmax = 1000 * unit.kelvin
+        ntemps = 8 # number of temperatures
+        from sams import ThermodynamicState
+        temperatures = unit.Quantity(np.logspace(np.log10(Tmin / unit.kelvin), np.log10(Tmax / unit.kelvin), ntemps), unit.kelvin)
+        self.thermodynamic_states = [ ThermodynamicState(system=self.system, temperature=temperature) for temperature in temperatures ]
+
+        # Create SAMS samplers
+        from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
+        thermodynamic_state_index = 0 # initial thermodynamic state index
+        thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
+        sampler_state = SamplerState(positions=self.positions)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
+        self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
+        self.mcmc_sampler.topology = self.topology
+        self.mcmc_sampler.timestep = timestep
+        self.mcmc_sampler.nsteps = 1000
+        self.mcmc_sampler.verbose = True
+        self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
+        self.exen_sampler.verbose = True
+        self.sams_sampler = SAMSSampler(self.exen_sampler)
+        self.sams_sampler.verbose = True
+
+        # Compute analytical logZ for each thermodynamic state.
+        self.logZ = np.zeros([ntemps], np.float64)
+        for (index, thermodynamic_state) in enumerate(self.thermodynamic_states):
+            beta = thermodynamic_state.beta
+            sigma = 1.0 / unit.sqrt(beta * K)
+            self.logZ[index] = 1.5 * np.log(2*np.pi) + 3.0 * np.log(sigma / unit.angstrom)
+        self.logZ[:] -= self.logZ[0]
 
 class AlanineDipeptideVacuumSimulatedTempering(SAMSTestSystem):
     """
@@ -128,8 +200,8 @@ class AlanineDipeptideVacuumSimulatedTempering(SAMSTestSystem):
     >>> testsystem = AlanineDipeptideVacuumSimulatedTempering()
 
     """
-    def __init__(self):
-        super(AlanineDipeptideVacuumSimulatedTempering, self).__init__()
+    def __init__(self, **kwargs):
+        super(AlanineDipeptideVacuumSimulatedTempering, self).__init__(**kwargs)
         self.description = 'Alanine dipeptide in vacuum simulated tempering simulation'
 
         # Create topology, positions, and system.
@@ -152,7 +224,7 @@ class AlanineDipeptideVacuumSimulatedTempering(SAMSTestSystem):
         thermodynamic_state_index = 0 # initial thermodynamic state index
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
         sampler_state = SamplerState(positions=self.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
         self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
         self.mcmc_sampler.nsteps = 500 # reduce number of steps for testing
@@ -184,8 +256,8 @@ class AlanineDipeptideExplicitSimulatedTempering(SAMSTestSystem):
     >>> testsystem = AlanineDipeptideExplicitSimulatedTempering()
 
     """
-    def __init__(self):
-        super(AlanineDipeptideExplicitSimulatedTempering, self).__init__()
+    def __init__(self, **kwargs):
+        super(AlanineDipeptideExplicitSimulatedTempering, self).__init__(**kwargs)
         self.description = 'Alanine dipeptide in explicit solvent simulated tempering simulation'
 
         # Create topology, positions, and system.
@@ -214,7 +286,7 @@ class AlanineDipeptideExplicitSimulatedTempering(SAMSTestSystem):
         thermodynamic_state_index = 0 # initial thermodynamic state index
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
         sampler_state = SamplerState(positions=self.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
         self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
         self.mcmc_sampler.nsteps = 50 # reduce number of steps for testing
@@ -246,8 +318,8 @@ class AlanineDipeptideVacuumAlchemical(SAMSTestSystem):
     >>> testsystem = AlanineDipeptideExplicitSimulatedTempering()
 
     """
-    def __init__(self):
-        super(AlanineDipeptideVacuumAlchemical, self).__init__()
+    def __init__(self, **kwargs):
+        super(AlanineDipeptideVacuumAlchemical, self).__init__(**kwargs)
         self.description = 'Alanine dipeptide in vacuum alchemical free energy calculation'
 
         # Create topology, positions, and system.
@@ -276,7 +348,7 @@ class AlanineDipeptideVacuumAlchemical(SAMSTestSystem):
         thermodynamic_state_index = 0 # initial thermodynamic state index
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
         sampler_state = SamplerState(positions=self.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
         self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
         self.mcmc_sampler.nsteps = 50 # reduce number of steps for testing
@@ -308,8 +380,8 @@ class AlanineDipeptideExplicitAlchemical(SAMSTestSystem):
     >>> testsystem = AlanineDipeptideExplicitSimulatedTempering()
 
     """
-    def __init__(self):
-        super(AlanineDipeptideExplicitAlchemical, self).__init__()
+    def __init__(self, **kwargs):
+        super(AlanineDipeptideExplicitAlchemical, self).__init__(**kwargs)
         self.description = 'Alanine dipeptide in explicit solvent alchemical free energy calculation'
 
         # Create topology, positions, and system.
@@ -347,7 +419,7 @@ class AlanineDipeptideExplicitAlchemical(SAMSTestSystem):
         thermodynamic_state_index = 0 # initial thermodynamic state index
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
         sampler_state = SamplerState(positions=self.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
         self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
         self.mcmc_sampler.nsteps = 50 # reduce number of steps for testing
@@ -379,8 +451,8 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
     >>> testsystem = AblImatinibExplicitAlchemical()
 
     """
-    def __init__(self):
-        super(AblImatinibExplicitAlchemical, self).__init__()
+    def __init__(self, **kwargs):
+        super(AblImatinibExplicitAlchemical, self).__init__(**kwargs)
         self.description = 'Abl:imatinib in explicit solvent alchemical free energy calculation'
 
         padding = 9.0*unit.angstrom
@@ -440,11 +512,6 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
             parameters = {'lambda_sterics' : (1.0 - float(state)/250.0), 'lambda_electrostatics' : 0.0 }
             self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
 
-        # Create storage file
-        import netCDF4
-        ncfilename = 'output.nc'
-        self.ncfile = netCDF4.Dataset(ncfilename, mode='w')
-
         # Create SAMS samplers
         print('Setting up samplers...')
         from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
@@ -457,6 +524,8 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         self.mcmc_sampler.nsteps = 500 # reduce number of steps for testing
         self.mcmc_sampler.verbose = True
         self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
+        self.exen_sampler.update_scheme = 'local'
+        self.exen_sampler.locality = 10
         self.exen_sampler.verbose = True
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
@@ -502,11 +571,10 @@ if __name__ == '__main__':
     #generate_ffxml(pdb_filename)
     #stop
 
-    testsystem = AblImatinibExplicitAlchemical()
+    netcdf_filename = 'output.nc'
+
+    #testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitAlchemical()
-    niterations = 2000
-    testsystem.mcmc_sampler.nsteps = 500
-    testsystem.mcmc_sampler.pdbfile = None
-    testsystem.exen_sampler.update_scheme = 'local'
-    testsystem.exen_sampler.locality = 10
+    testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
+    niterations = 1000
     testsystem.sams_sampler.run(niterations)

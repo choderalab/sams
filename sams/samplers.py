@@ -454,16 +454,22 @@ class MCMCSampler(object):
         self.sampler_state = sampler_state
         # Initialize
         self.iteration = 0
-        # For GHMC integrator
+        # For GHMC / Langevin integrator
         self.collision_rate = 1.0 / unit.picoseconds
         self.timestep = 2.0 * unit.femtoseconds
         self.nsteps = 500 # number of steps per update
         self.verbose = True
+        self.platform = platform
 
         # For writing PDB files
         self.pdbfile = None
         self.topology = None
 
+        self._timing = dict()
+        self._initializeNetCDF(ncfile)
+        self._initialized = False
+
+    def _initialize(self):
         # Create an integrator
         integrator_name = 'Langevin'
         if integrator_name == 'GHMC':
@@ -476,16 +482,15 @@ class MCMCSampler(object):
             raise Exception("integrator_name '%s' not valid." % (integrator_name))
 
         # Create a Context
-        if platform is not None:
-            self.context = openmm.Context(thermodynamic_state.system, self.integrator, platform)
+        if self.platform is not None:
+            self.context = openmm.Context(self.thermodynamic_state.system, self.integrator, platform)
         else:
-            self.context = openmm.Context(thermodynamic_state.system, self.integrator)
+            self.context = openmm.Context(self.thermodynamic_state.system, self.integrator)
         self.thermodynamic_state.update_context(self.context)
         self.sampler_state.update_context(self.context)
         self.context.setVelocitiesToTemperature(self.thermodynamic_state.temperature)
 
-        self._timing = dict()
-        self._initializeNetCDF(ncfile)
+        self._initialized = True
 
     def _initializeNetCDF(self, ncfile):
         self.ncfile = ncfile
@@ -505,13 +510,16 @@ class MCMCSampler(object):
         """
         Update the sampler with one step of sampling.
         """
+        if not self._initialized:
+            self._initialize()
+
         if self.verbose:
             print("." * 80)
             print("MCMC sampler iteration %d" % self.iteration)
 
         initial_time = time.time()
 
-        # Reset statsitics
+        # Reset statistics
         if hasattr(self.integrator, 'setGlobalVariableByName'):
             self.integrator.setGlobalVariableByName('naccept', 0)
 
@@ -777,7 +785,7 @@ class SAMSSampler(object):
 
     """
     def __init__(self, sampler, logZ=None, log_target_probabilities=None, update_stages='two-stage-all-visited', update_method='rao-blackwellized', adapt_target_probabilities=False,
-        guess_logZ=True):
+        guess_logZ=False):
         """
         Create a SAMS Sampler.
 
