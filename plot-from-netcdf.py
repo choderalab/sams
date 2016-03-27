@@ -8,6 +8,7 @@ ncfile = netCDF4.Dataset('output.nc', 'r')
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
+plt.rc('text', usetex=True)
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn
 
@@ -29,8 +30,8 @@ with PdfPages('alchemy.pdf') as pdf:
     logZ = ncfile.variables['logZ'][-2,:]
     plt.plot(logZ, 'ko')
     plt.title(testsystem.description)
-    plt.xlabel('state index')
-    plt.ylabel('log Z estimate')
+    plt.xlabel('state index $j$')
+    plt.ylabel('$\zeta^{(t)}$')
     plt.axis([0, nstates-1, 0.0, max(logZ)])
     if hasattr(testsystem, 'logZ'):
         plt.axis([0, nstates-1, 0.0, max(testsystem.logZ)])
@@ -41,7 +42,7 @@ with PdfPages('alchemy.pdf') as pdf:
     state_index = ncfile.variables['state_index'][:]
     plt.plot(state_index, '.')
     plt.title(testsystem.description)
-    plt.xlabel('iteration')
+    plt.xlabel('iteration $t$')
     plt.ylabel('state index')
     plt.axis([0, nsamples, 0, nstates-1])
     pdf.savefig()  # saves the current figure into a pdf page
@@ -57,8 +58,8 @@ with PdfPages('alchemy.pdf') as pdf:
     logZ = ncfile.variables['logZ'][:,:]
     plt.plot(logZ[:,:], '-')
     plt.title(testsystem.description)
-    plt.xlabel('iteration')
-    plt.ylabel('logZ estimate')
+    plt.xlabel('iteration $t$')
+    plt.ylabel('$\zeta^{(t)}$')
     plt.axis([0, nsamples, 0, logZ.max()])
     pdf.savefig()  # saves the current figure into a pdf page
 

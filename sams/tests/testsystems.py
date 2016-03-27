@@ -175,7 +175,7 @@ class HarmonicOscillatorSimulatedTempering(SAMSTestSystem):
         self.mcmc_sampler.verbose = True
         self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
         self.exen_sampler.verbose = True
-        self.sams_sampler = SAMSSampler(self.exen_sampler, update_stages='two-stage', update_method='rao-blackwellized')
+        self.sams_sampler = SAMSSampler(self.exen_sampler, update_stages='two-stage', update_method='optimal')
         self.sams_sampler.verbose = True
 
 
