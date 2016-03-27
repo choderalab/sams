@@ -85,7 +85,7 @@ class ThermodynamicState(object):
     >>> pressure = 1.0 * unit.atmospheres
     >>> temperature = 298.0 * unit.kelvin
     >>> barostat = openmm.MonteCarloBarostat(pressure, temperature)
-    >>> system.addForce(barostat)
+    >>> system.addForce(barostat);
     >>> state = ThermodynamicState(system=system, temperature=temperature, pressure=pressure)
 
     Notes
