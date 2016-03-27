@@ -1,0 +1,47 @@
+package:
+  name: sams-dev
+  version: 0.0.0
+
+source:
+  path: ../../
+
+build:
+  preserve_egg_dir: True
+  number: 0
+
+requirements:
+  build:
+    - python
+    - setuptools
+    - numpy
+    - scipy
+    - pymbar-dev
+    - openmm-dev
+    - parmed-dev
+    - openmoltools-dev
+    - alchemy-dev
+    - openmmtools-dev
+
+  run:
+    - python
+    - setuptools
+    - numpy
+    - scipy
+    - pymbar-dev
+    - openmm-dev
+    - parmed-dev
+    - openmoltools-dev
+    - alchemy-dev
+    - openmmtools-dev
+
+test:
+  requires:
+    - nose
+    - nose-timer
+  imports:
+    - sams
+
+
+about:
+  home: https://github.com/choderalab/perses
+  license: GNU Lesser General Public License v2 or later (LGPLv2+)
