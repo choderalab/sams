@@ -488,7 +488,7 @@ class MCMCSampler(object):
 
         # Create a Context
         if self.platform is not None:
-            self.context = openmm.Context(self.thermodynamic_state.system, self.integrator, platform)
+            self.context = openmm.Context(self.thermodynamic_state.system, self.integrator, self.platform)
         else:
             self.context = openmm.Context(self.thermodynamic_state.system, self.integrator)
         self.thermodynamic_state.update_context(self.context, self.integrator)
