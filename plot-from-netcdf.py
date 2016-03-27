@@ -12,10 +12,10 @@ plt.rc('text', usetex=True)
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn
 
-testsystem_name = 'HarmonicOscillatorSimulatedTempering'
-testsystem_name = 'AlanineDipeptideVacuumSimulatedTempering'
+#testsystem_name = 'HarmonicOscillatorSimulatedTempering'
+#testsystem_name = 'AlanineDipeptideVacuumSimulatedTempering'
 testsystem_name = 'AlanineDipeptideExplicitSimulatedTempering'
-testsystem_name = 'WaterBoxAlchemical'
+#testsystem_name = 'WaterBoxAlchemical'
 import sams.tests.testsystems
 testsystem_class = getattr(sams.tests.testsystems, testsystem_name)
 testsystem = testsystem_class()
@@ -52,12 +52,10 @@ with PdfPages('alchemy.pdf') as pdf:
 
     # PAGE 3
     plt.figure(figsize=(6, 6))
-
     if hasattr(testsystem, 'logZ'):
         plt.hold(True)
         M = np.tile(testsystem.logZ, [nsamples,1])
         plt.plot(M, ':')
-
     logZ = ncfile.variables['logZ'][:,:]
     plt.plot(logZ[:,:], '-')
     plt.title(testsystem.description)
@@ -66,6 +64,19 @@ with PdfPages('alchemy.pdf') as pdf:
     plt.axis([0, nsamples, logZ.min(), logZ.max()])
     pdf.savefig()  # saves the current figure into a pdf page
 
+    # PAGE 4
+    plt.figure(figsize=(6, 6))
+    if hasattr(testsystem, 'logZ'):
+        plt.hold(True)
+        M = np.tile(testsystem.logZ, [nsamples,1])
+        plt.plot(M, ':')
+    logZ = ncfile.variables['logZ'][:,:]
+    plt.plot(logZ[:,:], '-')
+    plt.title(testsystem.description)
+    plt.xlabel('iteration $t$')
+    plt.ylabel('$\zeta^{(t)}$')
+    plt.axis([0, nsamples, -1000, 0])
+    pdf.savefig()  # saves the current figure into a pdf page
 
     # FINISH
     plt.close()

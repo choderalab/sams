@@ -670,7 +670,8 @@ if __name__ == '__main__':
     #testsystem = AlanineDipeptideExplicitAlchemical()
     #testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideVacuumSimulatedTempering(netcdf_filename=netcdf_filename)
-    #testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
-    testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
+    testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
+    #testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
     niterations = 1000
+    testsystem.sams_sampler.mbar_update_interval = 1
     testsystem.sams_sampler.run(niterations)

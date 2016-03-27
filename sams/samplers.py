@@ -85,7 +85,7 @@ class ThermodynamicState(object):
     >>> pressure = 1.0 * unit.atmospheres
     >>> temperature = 298.0 * unit.kelvin
     >>> barostat = openmm.MonteCarloBarostat(pressure, temperature)
-    >>> system.addForce(barostat);
+    >>> force_index = system.addForce(barostat)
     >>> state = ThermodynamicState(system=system, temperature=temperature, pressure=pressure)
 
     Notes
@@ -672,9 +672,14 @@ class ExpandedEnsembleSampler(object):
         if self.ncfile == None:
             return
 
-        self.ncfile.createDimension('states', self.nstates)
+        nstates = self.nstates
+
+        self.ncfile.createDimension('states', nstates)
 
         self.ncfile.createVariable('state_index', 'i4', dimensions=('iterations',), chunksizes=(1,))
+        self.ncfile.createVariable('log_weights', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
+        self.ncfile.createVariable('log_P_k', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
+        self.ncfile.createVariable('u_k', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
         self.ncfile.createVariable('update_state_time', 'f4', dimensions=('iterations',), chunksizes=(1,))
 
     def update_positions(self):
@@ -698,18 +703,19 @@ class ExpandedEnsembleSampler(object):
             raise Exception("Update scheme '%s' not implemented." % self.update_scheme)
 
         # Compute unnormalized log probabilities for all thermodynamic states
-        log_P_k = np.zeros([len(neighborhood)], np.float64)
+        self.u_k = np.zeros([len(neighborhood)], np.float64)
+        self.log_P_k = np.zeros([len(neighborhood)], np.float64)
         for (neighborhood_index, state_index) in enumerate(neighborhood):
-            log_P_k[neighborhood_index] = self.log_weights[state_index] - self.thermodynamic_states[state_index].reduced_potential(self.sampler.context)
-        log_P_k -= logsumexp(log_P_k)
+            self.u_k[neighborhood_index] = self.thermodynamic_states[state_index].reduced_potential(self.sampler.context)
+            self.log_P_k[neighborhood_index] = self.log_weights[state_index] - self.u_k[neighborhood_index]
+        self.log_P_k -= logsumexp(self.log_P_k)
         # Update thermodynamic state index
-        P_k = np.exp(log_P_k)
+        P_k = np.exp(self.log_P_k)
         self.thermodynamic_state_index = np.random.choice(neighborhood, p=P_k)
         self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
         # Store log probabilities for use by SAMS sampler.
         # TODO: Store this in NetCDF history instead
         self.neighborhood = neighborhood
-        self.log_P_k = log_P_k
 
         if self.verbose:
             print('Current thermodynamic state index is %d' % self.thermodynamic_state_index)
@@ -738,6 +744,11 @@ class ExpandedEnsembleSampler(object):
 
         if self.ncfile:
             self.ncfile.variables['state_index'][self.iteration] = self.thermodynamic_state_index
+            self.ncfile.variables['log_weights'][self.iteration,:] = self.log_weights[:]
+            self.ncfile.variables['log_P_k'][self.iteration,:] = 0
+            self.ncfile.variables['log_P_k'][self.iteration,self.neighborhood] = self.log_P_k[:]
+            self.ncfile.variables['u_k'][self.iteration,:] = 0
+            self.ncfile.variables['u_k'][self.iteration,self.neighborhood] = self.u_k[:]
             self.ncfile.variables['update_state_time'][self.iteration] = self._timing['update state time']
 
         self.iteration += 1
@@ -794,7 +805,7 @@ class SAMSSampler(object):
 
     """
     def __init__(self, sampler, logZ=None, log_target_probabilities=None, update_stages='two-stage', update_method='rao-blackwellized', adapt_target_probabilities=False,
-        guess_logZ=False):
+        guess_logZ=False, mbar_update_interval=None):
         """
         Create a SAMS Sampler.
 
@@ -814,6 +825,8 @@ class SAMSSampler(object):
             If True, target probabilities will be adapted to achieve minimal thermodynamic length between terminal thermodynamic states.
         guess_logZ : bool, optional, default=False
             If True, will attempt to guess initial logZ from energies of initial snapshot in all thermodynamic states.
+        mbar_update_interval : int, optional, default=False
+            If set to a positive integer, MBAR will be used to update the estimates with the specified interval until histograms are flat.
 
         """
         # Check input arguments.
@@ -844,6 +857,8 @@ class SAMSSampler(object):
         if guess_logZ:
             self.guess_logZ()
 
+        self.mbar_update_interval = mbar_update_interval
+
         self._timing = self.sampler._timing
         self._initializeNetCDF(self.sampler.ncfile)
 
@@ -854,7 +869,6 @@ class SAMSSampler(object):
 
         nstates = self.sampler.nstates
         self.ncfile.createVariable('logZ', 'f4', dimensions=('iterations', 'states'), zlib=True, chunksizes=(1,nstates))
-        self.ncfile.createVariable('logP_k', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
         self.ncfile.createVariable('log_target_probabilities', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
         self.ncfile.createVariable('update_logZ_time', 'f4', dimensions=('iterations',), chunksizes=(1,))
 
@@ -911,13 +925,48 @@ class SAMSSampler(object):
         # Subtract off logZ[0] to prevent logZ from growing without bound
         self.logZ[:] -= self.logZ[0]
 
-        # Update log weights for expanded ensemble sampler sampler
-        self.sampler.log_weights[:] = self.log_target_probabilities[:] - self.logZ[:]
-
         final_time = time.time()
         elapsed_time = final_time - initial_time
         self._timing['update logZ time'] = elapsed_time
-        print('time elapsed %8.3f s' % elapsed_time)
+        if self.verbose:
+            print('time elapsed %8.3f s' % elapsed_time)
+
+    def update_logZ_with_mbar(self):
+        """
+        Use MBAR to update logZ estimates.
+        """
+        if not self.ncfile:
+            raise Exception("Cannot update logZ using MBAR since no NetCDF file is storing history.")
+
+        if not self.sampler.update_scheme == 'global':
+            raise Exception("Only global jump is implemented right now.")
+
+        # Extract relative energies.
+        if self.verbose:
+            print('Updating logZ estimate with MBAR...')
+        initial_time = time.time()
+        from pymbar import MBAR
+        #first = int(self.iteration / 2)
+        first = 0
+        if self.iteration > 20:
+            first = 10
+        u_kn = np.array(self.ncfile.variables['u_k'][first:,:]).T
+        [N_k, bins] = np.histogram(self.ncfile.variables['state_index'][first:], bins=(np.arange(self.sampler.nstates+1) - 0.5))
+        mbar = MBAR(u_kn, N_k)
+        self.logZ[:] = -mbar.f_k[:]
+        self.logZ -= self.logZ[0]
+        final_time = time.time()
+        elapsed_time = final_time - initial_time
+        self._timing['MBAR time'] = elapsed_time
+        if self.verbose:
+            print('MBAR time    %8.3f s' % elapsed_time)
+
+    def update_log_weights(self):
+        """
+        Update log weights for expanded ensemble sampler.
+        """
+        # Update log weights for expanded ensemble sampler sampler
+        self.sampler.log_weights[:] = self.log_target_probabilities[:] - self.logZ[:]
 
     def update(self):
         """
@@ -928,13 +977,19 @@ class SAMSSampler(object):
         if self.verbose:
             print("=" * 80)
             print("SAMS sampler iteration %5d" % self.iteration)
+
+        # Update positions and state index with expanded ensemble sampler.
         self.update_sampler()
+
+        # Update logZ estimates and expanded ensemble sampler log weights.
         self.update_logZ_estimates()
+        if self.mbar_update_interval and (not hasattr(self, 'second_stage_iteration_start')) and (((self.iteration+1) % self.mbar_update_interval) == 0):
+            self.update_logZ_with_mbar()
+
+        self.update_log_weights()
 
         if self.ncfile:
             self.ncfile.variables['logZ'][self.iteration,:] = self.logZ[:]
-            self.ncfile.variables['logP_k'][self.iteration,:] = 0
-            self.ncfile.variables['logP_k'][self.iteration,self.sampler.neighborhood] = self.sampler.log_P_k[:]
             self.ncfile.variables['log_target_probabilities'][self.iteration,:] = self.log_target_probabilities[:]
             self.ncfile.variables['update_logZ_time'][self.iteration] = self._timing['update logZ time']
             self.ncfile.sync()
@@ -942,7 +997,8 @@ class SAMSSampler(object):
         final_time = time.time()
         elapsed_time = final_time - initial_time
         self._timing['sams time'] = elapsed_time
-        print('total time   %8.3f s' % elapsed_time)
+        if self.verbose:
+            print('total time   %8.3f s' % elapsed_time)
 
         self.iteration += 1
         if self.verbose:
