@@ -167,7 +167,7 @@ class HarmonicOscillatorSimulatedTempering(SAMSTestSystem):
         self.mcmc_sampler.verbose = True
         self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
         self.exen_sampler.verbose = True
-        self.sams_sampler = SAMSSampler(self.exen_sampler)
+        self.sams_sampler = SAMSSampler(self.exen_sampler, update_stages='one-stage', update_method='rao-blackwellized')
         self.sams_sampler.verbose = True
 
         # Compute analytical logZ for each thermodynamic state.
@@ -576,5 +576,5 @@ if __name__ == '__main__':
     #testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitAlchemical()
     testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
-    niterations = 1000
+    niterations = 2000
     testsystem.sams_sampler.run(niterations)

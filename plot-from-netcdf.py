@@ -50,8 +50,6 @@ with PdfPages('alchemy.pdf') as pdf:
     if hasattr(testsystem, 'logZ'):
         plt.hold(True)
         M = np.tile(testsystem.logZ, [nsamples,1])
-        print M
-        print M.shape
         plt.plot(M, ':')
 
     logZ = ncfile.variables['logZ'][:,:]
