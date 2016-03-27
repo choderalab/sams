@@ -82,7 +82,11 @@ class ThermodynamicState(object):
     >>> beta = state.beta
 
     Specify an NPT state at 298 K and 1 atm pressure.
-    >>> state = ThermodynamicState(system=system, temperature=298.0*unit.kelvin, pressure=1.0*unit.atmospheres)
+    >>> pressure = 1.0 * unit.atmospheres
+    >>> temperature = 298.0 * unit.kelvin
+    >>> barostat = openmm.MonteCarloBarostat(pressure, temperature)
+    >>> system.addForce(barostat)
+    >>> state = ThermodynamicState(system=system, temperature=temperature, pressure=pressure)
 
     Notes
     -----
@@ -126,8 +130,8 @@ class ThermodynamicState(object):
                 raise Exception(msg)
         if pressure:
             forces = { system.getForce(index).__class__.__name__ : system.getForce(index) for index in range(system.getNumForces()) }
-            if not forces['MonteCarloBarostat']:
-                raise Exception("pressure was specified by no MonteCarloBarostat found")
+            if 'MonteCarloBarostat' not in forces:
+                raise Exception("pressure was specified but no MonteCarloBarostat was found in System")
 
         # Initialize.
         self.system = system            # the System object governing the potential energy computation
