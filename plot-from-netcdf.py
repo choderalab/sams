@@ -13,6 +13,8 @@ from matplotlib.backends.backend_pdf import PdfPages
 import seaborn
 
 testsystem_name = 'HarmonicOscillatorSimulatedTempering'
+testsystem_name = 'AlanineDipeptideVacuumSimulatedTempering'
+testsystem_name = 'AlanineDipeptideExplicitSimulatedTempering'
 import sams.tests.testsystems
 testsystem_class = getattr(sams.tests.testsystems, testsystem_name)
 testsystem = testsystem_class()
@@ -32,7 +34,7 @@ with PdfPages('alchemy.pdf') as pdf:
     plt.title(testsystem.description)
     plt.xlabel('state index $j$')
     plt.ylabel('$\zeta^{(t)}$')
-    plt.axis([0, nstates-1, 0.0, max(logZ)])
+    plt.axis([0, nstates-1, min(logZ), max(logZ)])
     if hasattr(testsystem, 'logZ'):
         plt.axis([0, nstates-1, 0.0, max(testsystem.logZ)])
     pdf.savefig()  # saves the current figure into a pdf page
@@ -60,7 +62,7 @@ with PdfPages('alchemy.pdf') as pdf:
     plt.title(testsystem.description)
     plt.xlabel('iteration $t$')
     plt.ylabel('$\zeta^{(t)}$')
-    plt.axis([0, nsamples, 0, logZ.max()])
+    plt.axis([0, nsamples, logZ.min(), logZ.max()])
     pdf.savefig()  # saves the current figure into a pdf page
 
 
