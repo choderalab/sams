@@ -505,8 +505,8 @@ if __name__ == '__main__':
     testsystem = AblImatinibExplicitAlchemical()
     #testsystem = AlanineDipeptideExplicitAlchemical()
     niterations = 2000
-    testsystem.mcmc_sampler.nsteps = 50
+    testsystem.mcmc_sampler.nsteps = 500
     testsystem.mcmc_sampler.pdbfile = None
     testsystem.exen_sampler.update_scheme = 'local'
-    testsystem.exen_sampler.locality = 20
+    testsystem.exen_sampler.locality = 10
     testsystem.sams_sampler.run(niterations)
