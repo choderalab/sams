@@ -948,11 +948,10 @@ class SAMSSampler(object):
         from pymbar import MBAR
         #first = int(self.iteration / 2)
         first = 0
-        if self.iteration > 20:
-            first = 10
         u_kn = np.array(self.ncfile.variables['u_k'][first:,:]).T
         [N_k, bins] = np.histogram(self.ncfile.variables['state_index'][first:], bins=(np.arange(self.sampler.nstates+1) - 0.5))
         mbar = MBAR(u_kn, N_k)
+        Deltaf_ij, dDeltaf_ij, Theta_ij = mbar.getFreeEnergyDifferences(compute_uncertainty=True, uncertainty_method='approximate')
         self.logZ[:] = -mbar.f_k[:]
         self.logZ -= self.logZ[0]
         final_time = time.time()

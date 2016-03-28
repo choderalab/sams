@@ -529,11 +529,11 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
         #self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
-        self.mcmc_sampler.nsteps = 500 # reduce number of steps for testing
+        self.mcmc_sampler.nsteps = 2500
         self.mcmc_sampler.verbose = True
         self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
-        self.exen_sampler.update_scheme = 'local'
-        self.exen_sampler.locality = 10
+        #self.exen_sampler.update_scheme = 'local'
+        #self.exen_sampler.locality = 10
         self.exen_sampler.verbose = True
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
@@ -666,12 +666,12 @@ if __name__ == '__main__':
 
     netcdf_filename = 'output.nc'
 
-    #testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
+    testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitAlchemical()
     #testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideVacuumSimulatedTempering(netcdf_filename=netcdf_filename)
-    testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
+    #testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
-    niterations = 1000
-    testsystem.sams_sampler.mbar_update_interval = 1
+    niterations = 10000
+    #testsystem.sams_sampler.mbar_update_interval = 50
     testsystem.sams_sampler.run(niterations)
