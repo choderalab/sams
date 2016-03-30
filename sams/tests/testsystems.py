@@ -529,11 +529,8 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
         #self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
-        self.mcmc_sampler.nsteps = 2500
         self.mcmc_sampler.verbose = True
         self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
-        self.exen_sampler.update_scheme = 'local-jump'
-        self.exen_sampler.locality = 10
         self.exen_sampler.verbose = True
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
@@ -679,13 +676,14 @@ if __name__ == '__main__':
 
     #testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
 
-    #testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
+    testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitAlchemical()
     #testsystem = AlanineDipeptideVacuumSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
-    testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
+    #testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
 
     testsystem.exen_sampler.update_scheme = 'local-jump'
+    testsystem.mcmc_sampler.nsteps = 500
     testsystem.exen_sampler.locality = 10
     testsystem.sams_sampler.update_method = 'optimal'
     niterations = 5000

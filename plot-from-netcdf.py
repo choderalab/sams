@@ -15,7 +15,8 @@ import seaborn
 #testsystem_name = 'HarmonicOscillatorSimulatedTempering'
 #testsystem_name = 'AlanineDipeptideVacuumSimulatedTempering'
 #testsystem_name = 'AlanineDipeptideExplicitSimulatedTempering'
-testsystem_name = 'WaterBoxAlchemical'
+#testsystem_name = 'WaterBoxAlchemical'
+testsystem_name = 'AblImatinibExplicitAlchemical'
 import sams.tests.testsystems
 testsystem_class = getattr(sams.tests.testsystems, testsystem_name)
 testsystem = testsystem_class()
