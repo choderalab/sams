@@ -532,8 +532,8 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         self.mcmc_sampler.nsteps = 2500
         self.mcmc_sampler.verbose = True
         self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
-        #self.exen_sampler.update_scheme = 'local'
-        #self.exen_sampler.locality = 10
+        self.exen_sampler.update_scheme = 'local-jump'
+        self.exen_sampler.locality = 10
         self.exen_sampler.verbose = True
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
@@ -563,9 +563,9 @@ class WaterBoxAlchemical(SAMSTestSystem):
     >>> testsystem = WaterBoxAlchemical()
 
     """
-    def __init__(self, **kwargs):
+    def __init__(self, alchemical_protocol='fused', **kwargs):
         super(WaterBoxAlchemical, self).__init__(**kwargs)
-        self.description = 'TIP3P water in TIP3P water NPT alchemical free energy calculation'
+        self.description = 'TIP3P water in TIP3P water NPT alchemical free energy calculation with %s protocol' % alchemical_protocol
 
         # Create topology, positions, and system.
         from openmmtools.testsystems import WaterBox
@@ -592,18 +592,30 @@ class WaterBoxAlchemical(SAMSTestSystem):
         pressure = 1.0 * unit.atmospheres
         alchemical_atoms = range(0,3) # water
         from alchemy import AbsoluteAlchemicalFactory
-        factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
+        if alchemical_protocol == 'two-stage':
+            factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
+        elif alchemical_protocol == 'fused':
+            factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False)
         self.system = factory.createPerturbedSystem()
         print('Setting up alchemical intermediates...')
         from sams import ThermodynamicState
         self.thermodynamic_states = list()
-        nstates_per_leg = 10
-        for state in range(nstates_per_leg+1):
-            parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/float(nstates_per_leg)) }
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
-        for state in range(1, nstates_per_leg+1):
-            parameters = {'lambda_sterics' : (1.0 - float(state)/float(nstates_per_leg)), 'lambda_electrostatics' : 0.0 }
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+
+        if alchemical_protocol == 'two-stage':
+            nstates_per_leg = 10
+            for state in range(nstates_per_leg+1):
+                parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/float(nstates_per_leg)) }
+                self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+            for state in range(1, nstates_per_leg+1):
+                parameters = {'lambda_sterics' : (1.0 - float(state)/float(nstates_per_leg)), 'lambda_electrostatics' : 0.0 }
+                self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+        elif alchemical_protocol == 'fused':
+            nstates = 32
+            for state in range(nstates):
+                parameters = {'lambda_sterics' : (1.0 - float(state)/float(nstates-1)) , 'lambda_electrostatics' : (1.0 - float(state)/float(nstates-1)) }
+                self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+        else:
+            raise Exception("alchemical_protocol '%s' unknown" % alchemical_protocol)
 
         # Create SAMS samplers
         print('Setting up samplers...')
@@ -612,13 +624,12 @@ class WaterBoxAlchemical(SAMSTestSystem):
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
         sampler_state = SamplerState(positions=self.positions)
         self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
+        self.mcmc_sampler.timestep = 2.0 * unit.femtoseconds
         #self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
         self.mcmc_sampler.nsteps = 500 # reduce number of steps for testing
         self.mcmc_sampler.verbose = True
         self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
-        #self.exen_sampler.update_scheme = 'local'
-        #self.exen_sampler.locality = 10
         self.exen_sampler.verbose = True
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
@@ -666,12 +677,17 @@ if __name__ == '__main__':
 
     netcdf_filename = 'output.nc'
 
-    testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
-    #testsystem = AlanineDipeptideExplicitAlchemical()
     #testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
+
+    #testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
+    #testsystem = AlanineDipeptideExplicitAlchemical()
     #testsystem = AlanineDipeptideVacuumSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
-    #testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
-    niterations = 10000
+    testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
+
+    testsystem.exen_sampler.update_scheme = 'local-jump'
+    testsystem.exen_sampler.locality = 10
+    testsystem.sams_sampler.update_method = 'optimal'
+    niterations = 5000
     #testsystem.sams_sampler.mbar_update_interval = 50
     testsystem.sams_sampler.run(niterations)

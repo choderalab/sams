@@ -617,7 +617,7 @@ class ExpandedEnsembleSampler(object):
     --------
 
     """
-    def __init__(self, sampler, thermodynamic_states, log_weights=None, update_scheme='global', locality=1):
+    def __init__(self, sampler, thermodynamic_states, log_weights=None, update_scheme='global-jump', locality=1):
         """
         Create an expanded ensemble sampler.
 
@@ -633,14 +633,13 @@ class ExpandedEnsembleSampler(object):
             Current chemical state
         log_weights : dict of object : float
             Log weights to use for expanded ensemble biases
-        update_scheme : str, optional, default='global'
-            Thermodynamic state update scheme, one of ['global', 'local']
+        update_scheme : str, optional, default='global-jump'
+            Thermodynamic state update scheme, one of ['neighbor', 'global-jump', 'local-jump', 'restricted-range']
         locality : int, optional, default=1
-            Number of neighboring states on either side to consider for 'local' update scheme
-
+            Number of neighboring states on either side to consider for local update schemes
 
         """
-        supported_update_schemes = ['neighbor', 'local', 'global']
+        supported_update_schemes = ['neighbor', 'local-jump', 'global-jump']
         if update_scheme not in supported_update_schemes:
             raise Exception("Update scheme '%s' not in list of supported update schemes: %s" % (update_scheme, str(supported_update_schemes)))
 
@@ -673,6 +672,8 @@ class ExpandedEnsembleSampler(object):
             return
 
         nstates = self.nstates
+        if self.update_scheme == 'global-jump':
+            self.locality = self.nstates
 
         self.ncfile.createDimension('states', nstates)
 
@@ -681,6 +682,7 @@ class ExpandedEnsembleSampler(object):
         self.ncfile.createVariable('log_P_k', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
         self.ncfile.createVariable('u_k', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
         self.ncfile.createVariable('update_state_time', 'f4', dimensions=('iterations',), chunksizes=(1,))
+        self.ncfile.createVariable('neighborhood', 'i1', dimensions=('iterations','states'), chunksizes=(1,nstates))
 
     def update_positions(self):
         """
@@ -694,28 +696,73 @@ class ExpandedEnsembleSampler(object):
         """
         initial_time = time.time()
 
-        state_index = self.thermodynamic_state_index
-        if self.update_scheme == 'local':
-            neighborhood = range(max(0, state_index - self.locality), min(self.nstates, state_index + self.locality))
-        elif self.update_scheme == 'global':
-            neighborhood = range(self.nstates)
+        current_state_index = self.thermodynamic_state_index
+        self.u_k = np.zeros([self.nstates], np.float64)
+        self.log_P_k = np.zeros([self.nstates], np.float64)
+        if self.update_scheme == 'local-jump':
+            # Determine current neighborhood.
+            neighborhood = range(max(0, current_state_index - self.locality), min(self.nstates, current_state_index + self.locality))
+            neighborhood.remove(current_state_index) # remove current state
+            neighborhood_size = len(neighborhood)
+            # Propose a move from the current neighborhood.
+            proposed_state_index = np.random.choice(neighborhood, p=np.ones([len(neighborhood)], np.float64) / float(neighborhood_size))
+            # Determine neighborhood for proposed state.
+            proposed_neighborhood = range(max(0, proposed_state_index - self.locality), min(self.nstates, proposed_state_index + self.locality))
+            proposed_neighborhood.remove(proposed_state_index)
+            proposed_neighborhood_size = len(proposed_neighborhood)
+            # Compute state log weights.
+            self.neighborhood = [current_state_index, proposed_state_index]
+            for j in self.neighborhood:
+                self.u_k[j] = self.thermodynamic_states[j].reduced_potential(self.sampler.context)
+                self.log_P_k[j] = self.log_weights[j] - self.u_k[j]
+            self.log_P_k[self.neighborhood] -= logsumexp(self.log_P_k[self.neighborhood])
+            P_k = np.exp(self.log_P_k[self.neighborhood])
+            # Accept or reject according to Metropolis criterion.
+            log_P_accept = np.log( float(neighborhood_size)/float(proposed_neighborhood_size) ) + self.log_P_k[proposed_state_index] - self.log_P_k[current_state_index]
+            if (log_P_accept >= 0.0) or (np.random.rand() < np.exp(log_P_accept)):
+                self.thermodynamic_state_index = proposed_state_index
+            # Update context.
+            self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
+        elif self.update_scheme == 'global-jump':
+            # Compute unnormalized log probabilities for all thermodynamic states
+            self.neighborhood = range(self.nstates)
+            for state_index in self.neighborhood:
+                self.u_k[state_index] = self.thermodynamic_states[state_index].reduced_potential(self.sampler.context)
+                self.log_P_k[state_index] = self.log_weights[state_index] - self.u_k[state_index]
+            self.log_P_k -= logsumexp(self.log_P_k)
+            # Update sampler Context to current thermodynamic state.
+            P_k = np.exp(self.log_P_k[self.neighborhood])
+            self.thermodynamic_state_index = np.random.choice(self.neighborhood, p=P_k)
+            self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
+        elif self.update_scheme == 'restricted-range':
+            # Propose new state from current neighborhood.
+            self.neighborhood = range(max(0, current_state_index - self.locality), min(self.nstates, current_state_index + self.locality))
+            for j in self.neighborhood:
+                self.u_k[j] = self.thermodynamic_states[j].reduced_potential(self.sampler.context)
+                self.log_P_k[j] = self.log_weights[j] - self.u_k[j]
+            self.log_P_k[self.neighborhood] -= logsumexp(self.log_P_k[self.neighborhood])
+            P_k = np.exp(self.log_P_k[self.neighborhood])
+            proposed_state_index = np.random.choice(self.neighborhood, p=P_k)
+            # Determine neighborhood of proposed state.
+            proposed_neighborhood = range(max(0, proposed_state_index - self.locality), min(self.nstates, proposed_state_index + self.locality))
+            proposed_log_P_k = np.zeros([self.nstates], np.float64)
+            for j in proposed_neighborhood:
+                if j not in self.neighborhood:
+                    self.u_k[j] = self.thermodynamic_states[j].reduced_potential(self.sampler.context)
+            # Accept or reject.
+            log_P_accept = logsumexp(self.log_weights[self.neighborhood] - self.u_k[self.neighborhood]) - logsumexp(self.log_weights[proposed_neighborhood] - self.u_k[proposed_neighborhood])
+            if (log_P_accept >= 0.0) or (np.random.rand() < np.exp(log_P_accept)):
+                self.thermodynamic_state_index = proposed_state_index
+            # Update context.
+            self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
         else:
             raise Exception("Update scheme '%s' not implemented." % self.update_scheme)
 
-        # Compute unnormalized log probabilities for all thermodynamic states
-        self.u_k = np.zeros([len(neighborhood)], np.float64)
-        self.log_P_k = np.zeros([len(neighborhood)], np.float64)
-        for (neighborhood_index, state_index) in enumerate(neighborhood):
-            self.u_k[neighborhood_index] = self.thermodynamic_states[state_index].reduced_potential(self.sampler.context)
-            self.log_P_k[neighborhood_index] = self.log_weights[state_index] - self.u_k[neighborhood_index]
-        self.log_P_k -= logsumexp(self.log_P_k)
-        # Update thermodynamic state index
-        P_k = np.exp(self.log_P_k)
-        self.thermodynamic_state_index = np.random.choice(neighborhood, p=P_k)
-        self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
-        # Store log probabilities for use by SAMS sampler.
-        # TODO: Store this in NetCDF history instead
-        self.neighborhood = neighborhood
+        # Track statistics.
+        if (self.thermodynamic_state_index != current_state_index):
+            self.naccepted += 1
+        else:
+            self.nrejected += 1
 
         if self.verbose:
             print('Current thermodynamic state index is %d' % self.thermodynamic_state_index)
@@ -746,9 +793,11 @@ class ExpandedEnsembleSampler(object):
             self.ncfile.variables['state_index'][self.iteration] = self.thermodynamic_state_index
             self.ncfile.variables['log_weights'][self.iteration,:] = self.log_weights[:]
             self.ncfile.variables['log_P_k'][self.iteration,:] = 0
-            self.ncfile.variables['log_P_k'][self.iteration,self.neighborhood] = self.log_P_k[:]
+            self.ncfile.variables['log_P_k'][self.iteration,:] = self.log_P_k[:]
             self.ncfile.variables['u_k'][self.iteration,:] = 0
-            self.ncfile.variables['u_k'][self.iteration,self.neighborhood] = self.u_k[:]
+            self.ncfile.variables['u_k'][self.iteration,:] = self.u_k[:]
+            self.ncfile.variables['neighborhood'][self.iteration,:] = 0
+            self.ncfile.variables['neighborhood'][self.iteration,self.neighborhood] = 1
             self.ncfile.variables['update_state_time'][self.iteration] = self._timing['update state time']
 
         self.iteration += 1
@@ -938,7 +987,7 @@ class SAMSSampler(object):
         if not self.ncfile:
             raise Exception("Cannot update logZ using MBAR since no NetCDF file is storing history.")
 
-        if not self.sampler.update_scheme == 'global':
+        if not self.sampler.update_scheme == 'global-jump':
             raise Exception("Only global jump is implemented right now.")
 
         # Extract relative energies.
