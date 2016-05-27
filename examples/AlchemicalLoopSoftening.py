@@ -52,7 +52,7 @@ class LoopSoftening(SAMSTestSystem):
         print('Creating mTOR test system...')
         forcefield = app.ForceField(*ffxmls)
         from simtk.openmm.app import PDBFile, Modeller
-        pdb_filename = resource_filename('sams', os.path.join(setup_path, 'mtor_schrodinger.pdb'))
+        pdb_filename = resource_filename('sams', os.path.join(setup_path, 'mtor_pdbfixer_apo.pdb'))
 
         pdbfile = PDBFile(pdb_filename)
         modeller = app.Modeller(pdbfile.topology, pdbfile.positions)
@@ -76,7 +76,7 @@ class LoopSoftening(SAMSTestSystem):
             start = min(t.top.select('residue %s' % min(x)))
             end = max(t.top.select('residue %s' % max(x))) + 1
             alchemical_atoms.append(list(range(start, end)))
-        print(alchemical_atoms)
+        #print(alchemical_atoms)
 
 
         # Add a MonteCarloBarostat
@@ -130,6 +130,5 @@ if __name__ == '__main__':
     system.mcmc_sampler.nsteps = 500
     system.exen_sampler.locality = 10
     system.sams_sampler.update_method = 'optimal'
-    niterations = 6000
-    #testsystem.sams_sampler.mbar_update_interval = 50
-    testsystem.sams_sampler.run(niterations)
+    niterations = 5
+    system.sams_sampler.run(niterations)
