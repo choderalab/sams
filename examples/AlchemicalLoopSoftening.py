@@ -11,11 +11,11 @@ import mdtraj as md
 from sams.tests.testsystems import SAMSTestSystem
 
 
-def minimize(testsystem):
+def minimize(testsystem, positions):
     print("Minimizing...")
     integrator = openmm.VerletIntegrator(1.0 * unit.femtoseconds)
     context = openmm.Context(testsystem, integrator)
-    context.setPositions(positions=testsystem.positions)
+    context.setPositions(positions=positions)
     print("Initial energy is %12.3f kcal/mol" % (
     context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     TOL = 1.0
@@ -139,7 +139,7 @@ class LoopSoftening(SAMSTestSystem):
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
 
-        minimize(self.system)
+        minimize(self.system, self.positions)
 
 
 if __name__ == '__main__':
