@@ -18,15 +18,15 @@ def minimize(testsystem, positions):
     context.setPositions(positions=positions)
     print("Initial energy is %12.3f kcal/mol" % (
     context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
-    TOL = 1.0
-    MAX_STEPS = 50
+    TOL = .90
+    MAX_STEPS = 100
     openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
     print("Final energy is   %12.3f kcal/mol" % (
     context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     # Update positions.
     testsystem.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
     # Update sampler states.
-    testsystem.mcmc_samplers.sampler_state.positions = testsystem.positions
+    #testsystem.mcmc_samplers.sampler_state.positions = testsystem.positions
     # Clean up
     del context, integrator
 
@@ -123,13 +123,14 @@ class LoopSoftening(SAMSTestSystem):
             parameters = {'lambda_sterics' : (1.0 - float(state)/250.0), 'lambda_electrostatics' : 0.0 }
             self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
 
+        minimize(self.system, self.positions)
 
         # Create SAMS samplers
         print('Setting up samplers...')
         from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
         thermodynamic_state_index = 0 # initial thermodynamic state index
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
-        sampler_state = SamplerState(positions=self.positions)
+        sampler_state = SamplerState(positions=self.system.positions)
         self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
         self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
@@ -139,7 +140,6 @@ class LoopSoftening(SAMSTestSystem):
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
 
-        minimize(self.system, self.positions)
 
 
 if __name__ == '__main__':
