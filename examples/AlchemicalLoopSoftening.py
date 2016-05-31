@@ -11,6 +11,25 @@ import mdtraj as md
 from sams.tests.testsystems import SAMSTestSystem
 
 
+def minimize(testsystem):
+    print("Minimizing...")
+    integrator = openmm.VerletIntegrator(1.0 * unit.femtoseconds)
+    context = openmm.Context(testsystem, integrator)
+    context.setPositions(testsystem.positions())
+    print("Initial energy is %12.3f kcal/mol" % (
+    context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    TOL = 1.0
+    MAX_STEPS = 50
+    openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
+    print("Final energy is   %12.3f kcal/mol" % (
+    context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    # Update positions.
+    testsystem.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
+    # Update sampler states.
+    testsystem.mcmc_samplers.sampler_state.positions = testsystem.positions
+    # Clean up
+    del context, integrator
+
 class LoopSoftening(SAMSTestSystem):
     """
     Alchemical free energy calculation for Abl:imatinib in explicit solvent.
@@ -103,6 +122,7 @@ class LoopSoftening(SAMSTestSystem):
         for state in range(1,251):
             parameters = {'lambda_sterics' : (1.0 - float(state)/250.0), 'lambda_electrostatics' : 0.0 }
             self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+
 
         # Create SAMS samplers
         print('Setting up samplers...')
