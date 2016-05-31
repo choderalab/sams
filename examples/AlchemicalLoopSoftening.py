@@ -15,7 +15,7 @@ def minimize(testsystem):
     print("Minimizing...")
     integrator = openmm.VerletIntegrator(1.0 * unit.femtoseconds)
     context = openmm.Context(testsystem, integrator)
-    context.setPositions(testsystem.positions())
+    context.setPositions(testsystem.positions)
     print("Initial energy is %12.3f kcal/mol" % (
     context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     TOL = 1.0
@@ -138,6 +138,8 @@ class LoopSoftening(SAMSTestSystem):
         self.exen_sampler.verbose = True
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
+        
+        minimize(self.system)
 
 
 if __name__ == '__main__':
