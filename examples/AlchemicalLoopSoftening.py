@@ -13,21 +13,28 @@ from sams.tests.testsystems import SAMSTestSystem
 
 def minimize(testsystem, positions):
     print("Minimizing...")
-    integrator = openmm.VerletIntegrator(1.0 * unit.femtoseconds)
+    integrator = openmm.LangevinIntegrator(300 * unit.kelvin, 90.0 / unit.picoseconds, 1.0 * unit.femtoseconds)
     context = openmm.Context(testsystem, integrator)
     context.setPositions(positions=positions)
     print("Initial energy is %12.3f kcal/mol" % (
     context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     TOL = .90
-    MAX_STEPS = 100
+    MAX_STEPS = 200
     openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
     print("Final energy is   %12.3f kcal/mol" % (
     context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
-    # Update positions.
+
+    # Run some dynamics on minimized system
+    niterations = 10
+    nsteps_per_iteration = 50
+    for iteration in range(niterations):
+        integrator.step(nsteps_per_iteration)
+        potential_energy = context.getState(getEnergy=True).getPotentialEnergy()
+        print('Energy after iteration %d of %d steps : %s' % (
+        iteration, nsteps_per_iteration, potential_energy / unit.kilocalories_per_mole))
+
+    # Update positions
     testsystem.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
-    # Update sampler states.
-    #testsystem.mcmc_samplers.sampler_state.positions = testsystem.positions
-    # Clean up
     del context, integrator
 
 class LoopSoftening(SAMSTestSystem):
@@ -140,10 +147,7 @@ class LoopSoftening(SAMSTestSystem):
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
 
-
-
 if __name__ == '__main__':
-
 
     netcdf_filename = 'output.nc'
 
@@ -152,5 +156,5 @@ if __name__ == '__main__':
     system.mcmc_sampler.nsteps = 500
     system.exen_sampler.locality = 10
     system.sams_sampler.update_method = 'optimal'
-    niterations = 5
+    niterations = 100
     system.sams_sampler.run(niterations)
