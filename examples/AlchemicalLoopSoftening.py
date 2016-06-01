@@ -118,17 +118,20 @@ class LoopSoftening(SAMSTestSystem):
 
         alchemical_atoms = range(0,69) # Abl:imatinib
         from alchemy import AbsoluteAlchemicalFactory
-        factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
+        factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True,
+                                            annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
         self.system = factory.createPerturbedSystem()
         print('Setting up alchemical intermediates...')
         from sams import ThermodynamicState
         self.thermodynamic_states = list()
         for state in range(251):
             parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/250.0) }
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature,
+                                                                 parameters=parameters) )
         for state in range(1,251):
             parameters = {'lambda_sterics' : (1.0 - float(state)/250.0), 'lambda_electrostatics' : 0.0 }
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature,
+                                                                 parameters=parameters) )
 
         minimize(self.system, self.positions)
 
@@ -138,7 +141,8 @@ class LoopSoftening(SAMSTestSystem):
         thermodynamic_state_index = 0 # initial thermodynamic state index
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
         sampler_state = SamplerState(positions=self.system.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state,
+                                        ncfile=self.ncfile)
         self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
         self.mcmc_sampler.verbose = True
