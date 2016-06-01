@@ -101,7 +101,7 @@ class LoopSoftening(SAMSTestSystem):
         for x in res_pairs:
             start = min(t.top.select('residue %s' % min(x)))
             end = max(t.top.select('residue %s' % max(x))) + 1
-            alchemical_atoms.append(list(range(start, end)))
+            alchemical_atoms.append(range(start, end))
 
 
         # Create thermodynamic states.
