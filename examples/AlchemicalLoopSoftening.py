@@ -102,21 +102,13 @@ class LoopSoftening(SAMSTestSystem):
             start = min(t.top.select('residue %s' % min(x)))
             end = max(t.top.select('residue %s' % max(x))) + 1
             alchemical_atoms.append(list(range(start, end)))
-        #print(alchemical_atoms)
 
-
-        # Add a MonteCarloBarostat
-        #temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
-        #pressure = 1.0 * unit.atmospheres
-        #barostat = openmm.MonteCarloBarostat(pressure, temperature)
-        #self.system.addForce(barostat)
 
         # Create thermodynamic states.
         print('Creating alchemically-modified system...')
         temperature = 300 * unit.kelvin
         pressure = 1.0 * unit.atmospheres
 
-       #alchemical_atoms = range(0,69) # Abl:imatinib
         from alchemy import AbsoluteAlchemicalFactory
         factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True,
                                             annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
