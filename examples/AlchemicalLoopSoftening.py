@@ -97,11 +97,11 @@ class LoopSoftening(SAMSTestSystem):
         # Atom Selection using MDtraj
         res_pairs = [[403, 483], [1052, 1109]]
         t = md.load(pdb_filename)
-        alchemical_atoms = []
+        alchemical_atoms = set()
         for x in res_pairs:
             start = min(t.top.select('residue %s' % min(x)))
             end = max(t.top.select('residue %s' % max(x))) + 1
-            alchemical_atoms.append(range(start, end))
+            alchemical_atoms.union(set(range(start, end)))
 
 
         # Create thermodynamic states.
