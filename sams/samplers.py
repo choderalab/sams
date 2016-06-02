@@ -30,6 +30,7 @@ import numpy as np
 import copy
 import time
 from scipy.misc import logsumexp
+from past.builtins import range
 
 from openmmtools import testsystems
 
