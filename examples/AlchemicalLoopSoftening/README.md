@@ -1,0 +1,1 @@
+An example script for alchemical loop refinement on mTOR using MDtraj for atom selection
