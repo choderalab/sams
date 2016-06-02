@@ -152,5 +152,5 @@ if __name__ == '__main__':
     system.mcmc_sampler.nsteps = 500
     system.exen_sampler.locality = 10
     system.sams_sampler.update_method = 'optimal'
-    niterations = 5000
+    niterations = 10000
     system.sams_sampler.run(niterations)
