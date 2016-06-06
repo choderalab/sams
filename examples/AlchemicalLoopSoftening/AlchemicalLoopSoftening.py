@@ -111,7 +111,8 @@ class LoopSoftening(SAMSTestSystem):
 
         from alchemy import AbsoluteAlchemicalFactory
         factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True,
-                                            annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
+                                            alchemical_torsions=True, annihilate_sterics=False,
+                                            softcore_beta=0.0) # turn off softcore electrostatics
         self.system = factory.createPerturbedSystem()
         print('Setting up alchemical intermediates...')
         from sams import ThermodynamicState
