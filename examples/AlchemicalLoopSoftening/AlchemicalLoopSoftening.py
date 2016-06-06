@@ -149,7 +149,7 @@ if __name__ == '__main__':
     netcdf_filename = 'output.nc'
 
     system = LoopSoftening(netcdf_filename=netcdf_filename)
-    system.exen_sampler.update_scheme = 'local-jump'
+    system.exen_sampler.update_scheme = 'global-jump'
     system.mcmc_sampler.nsteps = 5000
     system.exen_sampler.locality = 10
     system.sams_sampler.update_method = 'optimal'
