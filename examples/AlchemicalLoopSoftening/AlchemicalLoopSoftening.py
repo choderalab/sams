@@ -111,18 +111,18 @@ class LoopSoftening(SAMSTestSystem):
 
         from alchemy import AbsoluteAlchemicalFactory
         factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True,
-                                            alchemical_torsions=True, annihilate_sterics=False,
-                                            softcore_beta=0.0) # turn off softcore electrostatics
+                                            alchemical_torsions=True, annihilate_sterics=True,
+                                            softcore_beta=0.0)  # turn off softcore electrostatics
         self.system = factory.createPerturbedSystem()
         print('Setting up alchemical intermediates...')
         from sams import ThermodynamicState
         self.thermodynamic_states = list()
-        for state in range(251):
-            parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/250.0) }
+        for state in range(26):
+            parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/25.0) }
             self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature,
                                                                  parameters=parameters) )
-        for state in range(1,251):
-            parameters = {'lambda_sterics' : (1.0 - float(state)/250.0), 'lambda_electrostatics' : 0.0 }
+        for state in range(1,26):
+            parameters = {'lambda_sterics' : (1.0 - float(state)/25.0), 'lambda_electrostatics' : 0.0 }
             self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature,
                                                                  parameters=parameters) )
 
@@ -131,7 +131,7 @@ class LoopSoftening(SAMSTestSystem):
         # Create SAMS samplers
         print('Setting up samplers...')
         from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
-        thermodynamic_state_index = 0 # initial thermodynamic state index
+        thermodynamic_state_index = 0  # initial thermodynamic state index
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
         sampler_state = SamplerState(positions=self.system.positions)
         self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state,
@@ -150,7 +150,7 @@ if __name__ == '__main__':
 
     system = LoopSoftening(netcdf_filename=netcdf_filename)
     system.exen_sampler.update_scheme = 'local-jump'
-    system.mcmc_sampler.nsteps = 500
+    system.mcmc_sampler.nsteps = 5000
     system.exen_sampler.locality = 10
     system.sams_sampler.update_method = 'optimal'
     niterations = 10000
