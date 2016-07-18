@@ -11,13 +11,9 @@ import matplotlib.pyplot as plt
 plt.rc('text', usetex=True)
 from matplotlib.backends.backend_pdf import PdfPages
 import seaborn
+from Alchemical
 
-#testsystem_name = 'HarmonicOscillatorSimulatedTempering'
-#testsystem_name = 'AlanineDipeptideVacuumSimulatedTempering'
-#testsystem_name = 'AlanineDipeptideExplicitSimulatedTempering'
-#testsystem_name = 'WaterBoxAlchemical'
-#testsystem_name = 'AblImatinibExplicitAlchemical'
-testsystem_name = 'LoopSoftening'
+
 import sams.tests.testsystems
 testsystem_class = getattr(sams.tests.testsystems, testsystem_name)
 testsystem = testsystem_class()
