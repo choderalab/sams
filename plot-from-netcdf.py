@@ -1,7 +1,8 @@
 import numpy as np
 import netCDF4
+import mdtraj as md
 
-ncfile = netCDF4.Dataset('output.nc', 'r')
+ncfile = netCDF4.Dataset('examples/AlchemicalLoopSoftening/output.nc', 'r')
 
 [nsamples, nstates] = ncfile.variables['logZ'].shape
 

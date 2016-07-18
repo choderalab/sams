@@ -33,6 +33,7 @@ from functools import partial
 from pkg_resources import resource_filename
 from openeye import oechem
 from openmmtools import testsystems
+import mdtraj as md
 
 ################################################################################
 # CONSTANTS
