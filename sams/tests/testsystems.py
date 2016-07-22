@@ -725,7 +725,8 @@ class LoopSoftening(SAMSTestSystem):
             self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature,
                                                                  parameters=parameters) )
 
-        minimize(self.system, self.positions)
+        #minimize(self.system, self.positions)
+        minimize(self.system)
 
         # Create SAMS samplers
         print('Setting up samplers...')
