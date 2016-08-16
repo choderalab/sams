@@ -15,24 +15,24 @@ requirements:
     - setuptools
     - numpy
     - scipy
-    - pymbar-dev
-    - openmm-dev
-    - parmed-dev
-    - openmoltools-dev
-    - alchemy-dev
-    - openmmtools-dev
+    - pymbar
+    - openmm >=7.1.0
+    - parmed
+    - openmoltools
+    - alchemy
+    - openmmtools
 
   run:
     - python
     - setuptools
     - numpy
     - scipy
-    - pymbar-dev
-    - openmm-dev
-    - parmed-dev
-    - openmoltools-dev
-    - alchemy-dev
-    - openmmtools-dev
+    - pymbar
+    - openmm >=7.1.0
+    - parmed
+    - openmoltools
+    - alchemy
+    - openmmtools
 
 test:
   requires:

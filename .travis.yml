@@ -15,6 +15,8 @@ install:
 script:
   # Add omnia channel
   - conda config --add channels ${ORGNAME}
+  # Add omnia dev channel
+  - conda config --add channels https://conda.anaconda.org/omnia/label/dev
   # build the recipe
   - conda build devtools/conda-recipe
   # Test the local installation

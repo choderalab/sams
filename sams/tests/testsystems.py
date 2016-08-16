@@ -29,6 +29,7 @@ from simtk.openmm import app
 import os, os.path
 import sys, math
 import numpy as np
+import time
 from functools import partial
 from pkg_resources import resource_filename
 from openeye import oechem
@@ -305,7 +306,111 @@ class AlanineDipeptideExplicitSimulatedTempering(SAMSTestSystem):
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
 
-class AlanineDipeptideVacuumAlchemical(SAMSTestSystem):
+class AlchemicalSAMSTestSystem(SAMSTestSystem):
+    """
+    Alchemical free energy calculation SAMS test system base class.
+
+    Properties
+    ----------
+
+    Assumes the following properties have been defined before calling the constructor:
+
+    topology : simtk.openmm.app.Topology
+        The system Topology
+    system : simtk.openmm.System
+        The OpenMM System to simulate
+    positions : simtk.unit.Quantity of [nparticles,3] with units compatible with nanometers
+        Initial positions
+    alchemical_atoms : list of int
+        The atoms to be alchemically annihilated.
+    temperature : simtk.unit.Quantity with units compatible with kelvin
+        Temperature
+    pressure : simtk.unit.Quantity with units compatible with atmospheres, optional, default=None
+        Pressure
+
+    """
+    def __init__(self, alchemical_protocol='two-stage', nlambda=50, **kwargs):
+        """
+        Create an alchemical free energy calculation SAMS test system from the provided system.
+
+        Parameters
+        ----------
+        alchemical_protocol : str, optional, default='two-stage'
+            Alchemical protocol scheme to use. ['two-stage', 'fused']
+        nlambda : int, optional, default=50
+            Number of alchemical states.
+
+        """
+        super(AlchemicalSAMSTestSystem, self).__init__(**kwargs)
+        self.description = 'Alchemical SAMS test system'
+
+        if not (hasattr(self, 'topology') and hasattr(self, 'system') and hasattr(self, 'positions') and hasattr(self, 'alchemical_atoms')):
+            raise Exception("%s: 'topology', 'system', 'positions', and 'alchemical_atoms' properties must be defined!" % self.__class__.__name__)
+        if not hasattr(self, 'temperature'):
+            self.temperature = 300 * unit.kelvin
+        if not hasattr(self, 'temperature'):
+            self.temperature = 300 * unit.kelvin
+        if not hasattr(self, 'pressure'):
+            self.pressure = None
+
+        # Add a MonteCarloBarostat if system does not have one
+        has_barostat = False
+        for force in self.system.getForces():
+            if force.__class__.__name__ in ['MonteCarloBarostat', 'MonteCarloAnisotropicBarostat']:
+                has_barostat = True
+        if (self.pressure is not None) and (not has_barostat):
+            barostat = openmm.MonteCarloBarostat(self.pressure, self.temperature)
+            self.system.addForce(barostat)
+
+        if 'alchemical_protocol' == 'fused':
+            # Create thermodynamic states.
+            from alchemy import AbsoluteAlchemicalFactory
+            factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=self.alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False)
+            self.system = factory.createPerturbedSystem()
+            from sams import ThermodynamicState
+            alchemical_lambdas = np.linspace(1.0, 0.0, nlambda)
+            self.thermodynamic_states = list()
+            for alchemical_lambda in alchemical_lambdas:
+                parameters = {'lambda_sterics' : alchemical_lambda, 'lambda_electrostatics' : alchemical_lambda}
+                self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=self.temperature, pressure=self.pressure, parameters=parameters) )
+        elif alchemical_protocol == 'two-stage':
+            # Create thermodynamic states.
+            print('Creating alchemically-modified system...')
+            from alchemy import AbsoluteAlchemicalFactory
+            factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=self.alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
+            self.system = factory.createPerturbedSystem()
+            print('Setting up alchemical intermediates...')
+            from sams import ThermodynamicState
+            self.thermodynamic_states = list()
+            nelec = int(nlambda/2.0)
+            nvdw = nlambda - nelec
+            for state in range(nelec+1):
+                parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/float(nelec)) }
+                self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=self.temperature, pressure=self.pressure, parameters=parameters) )
+            for state in range(1,nvdw+1):
+                parameters = {'lambda_sterics' : (1.0 - float(state)/float(nvdw)), 'lambda_electrostatics' : 0.0 }
+                self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=self.temperature, pressure=self.pressure, parameters=parameters) )
+        else:
+            raise Exception("'alchemical_protocol' must be one of ['two-stage', 'fused']; scheme '%s' unknown." % alchemical_protocol)
+
+        # Create SAMS samplers
+        print('Setting up samplers...')
+        from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
+        thermodynamic_state_index = 0 # initial thermodynamic state index
+        thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
+        sampler_state = SamplerState(positions=self.positions)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
+        self.mcmc_sampler.timestep = 2.0 * unit.femtoseconds
+        self.mcmc_sampler.nsteps = 500
+        #self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
+        self.mcmc_sampler.topology = self.topology
+        self.mcmc_sampler.verbose = True
+        self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
+        self.exen_sampler.verbose = True
+        self.sams_sampler = SAMSSampler(self.exen_sampler)
+        self.sams_sampler.verbose = True
+
+class AlanineDipeptideVacuumAlchemical(AlchemicalSAMSTestSystem):
     """
     Alchemical free energy calculation for alanine dipeptide in vacuum.
 
@@ -328,46 +433,19 @@ class AlanineDipeptideVacuumAlchemical(SAMSTestSystem):
 
     """
     def __init__(self, **kwargs):
-        super(AlanineDipeptideVacuumAlchemical, self).__init__(**kwargs)
-        self.description = 'Alanine dipeptide in vacuum alchemical free energy calculation'
-
         # Create topology, positions, and system.
         from openmmtools.testsystems import AlanineDipeptideVacuum
         testsystem = AlanineDipeptideVacuum()
         self.topology = testsystem.topology
         self.positions = testsystem.positions
         self.system = testsystem.system
+        self.alchemical_atoms = range(0,22) # alanine dipeptide
+        self.temperature = 300.0 * unit.kelvin
 
-        # Create thermodynamic states.
-        temperature = 300 * unit.kelvin
-        alchemical_atoms = range(0,22) # alanine dipeptide
-        from alchemy import AbsoluteAlchemicalFactory
-        factory = AbsoluteAlchemicalFactory(testsystem.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False)
-        self.system = factory.createPerturbedSystem()
-        nlambda = 32 # number of alchemical intermediates
-        from sams import ThermodynamicState
-        alchemical_lambdas = np.linspace(1.0, 0.0, nlambda)
-        self.thermodynamic_states = list()
-        for alchemical_lambda in alchemical_lambdas:
-            parameters = {'lambda_sterics' : alchemical_lambda, 'lambda_electrostatics' : alchemical_lambda}
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+        super(AlanineDipeptideVacuumAlchemical, self).__init__(**kwargs)
+        self.description = 'Alanine dipeptide in vacuum alchemical free energy calculation'
 
-        # Create SAMS samplers
-        from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
-        thermodynamic_state_index = 0 # thermodynamic state index
-        thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
-        sampler_state = SamplerState(positions=self.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
-        self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
-        self.mcmc_sampler.topology = self.topology
-        self.mcmc_sampler.nsteps = 50 # reduce number of steps for testing
-        self.mcmc_sampler.verbose = True
-        self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
-        self.exen_sampler.verbose = True
-        self.sams_sampler = SAMSSampler(self.exen_sampler)
-        self.sams_sampler.verbose = True
-
-class AlanineDipeptideExplicitAlchemical(SAMSTestSystem):
+class AlanineDipeptideExplicitAlchemical(AlchemicalSAMSTestSystem):
     """
     Alchemical free energy calculation for alanine dipeptide in explicit solvent.
 
@@ -390,157 +468,20 @@ class AlanineDipeptideExplicitAlchemical(SAMSTestSystem):
 
     """
     def __init__(self, **kwargs):
-        super(AlanineDipeptideExplicitAlchemical, self).__init__(**kwargs)
-        self.description = 'Alanine dipeptide in explicit solvent alchemical free energy calculation'
-
         # Create topology, positions, and system.
         from openmmtools.testsystems import AlanineDipeptideExplicit
         testsystem = AlanineDipeptideExplicit(nonbondedMethod=app.CutoffPeriodic)
         self.topology = testsystem.topology
         self.positions = testsystem.positions
         self.system = testsystem.system
+        self.alchemical_atoms = range(0,22) # alanine dipeptide
+        self.temperature = 300 * unit.kelvin
+        self.pressure = 1.0 * unit.atmospheres
 
-        # Add a MonteCarloBarostat
-        #temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
-        #pressure = 1.0 * unit.atmospheres
-        #barostat = openmm.MonteCarloBarostat(pressure, temperature)
-        #self.system.addForce(barostat)
+        super(AlanineDipeptideExplicitAlchemical, self).__init__(**kwargs)
+        self.description = 'Alanine dipeptide in explicit solvent alchemical free energy calculation'
 
-        # Create thermodynamic states.
-        temperature = 300 * unit.kelvin
-        pressure = 1.0 * unit.atmospheres
-        alchemical_atoms = range(0,22) # alanine dipeptide
-        from alchemy import AbsoluteAlchemicalFactory
-        factory = AbsoluteAlchemicalFactory(testsystem.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False)
-        self.system = factory.createPerturbedSystem()
-        nlambda = 512 # number of alchemical intermediates
-        from sams import ThermodynamicState
-        alchemical_lambdas = np.linspace(1.0, 0.0, nlambda)
-        self.thermodynamic_states = list()
-        for alchemical_lambda in alchemical_lambdas:
-            parameters = {'lambda_sterics' : alchemical_lambda, 'lambda_electrostatics' : alchemical_lambda}
-            #parameters = {'lambda_electrostatics' : alchemical_lambda}
-            #self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, pressure=pressure, parameters=parameters) )
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
-
-        # Create SAMS samplers
-        from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
-        thermodynamic_state_index = 0 # initial thermodynamic state index
-        thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
-        sampler_state = SamplerState(positions=self.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
-        self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
-        self.mcmc_sampler.topology = self.topology
-        self.mcmc_sampler.nsteps = 50 # reduce number of steps for testing
-        self.mcmc_sampler.verbose = True
-        self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
-        self.exen_sampler.verbose = True
-        self.sams_sampler = SAMSSampler(self.exen_sampler)
-        self.sams_sampler.verbose = True
-
-class AblImatinibExplicitAlchemical(SAMSTestSystem):
-    """
-    Alchemical free energy calculation for Abl:imatinib in explicit solvent.
-
-    Properties
-    ----------
-    topology : simtk.openmm.app.Topology
-        The system Topology
-    system : simtk.openmm.System
-        The OpenMM System to simulate
-    positions : simtk.unit.Quantity of [nparticles,3] with units compatible with nanometers
-        Initial positions
-    thermodynamic_states : list of ThermodynamicState
-        List of thermodynamic states to be used in expanded ensemble sampling
-
-    Examples
-    --------
-
-    >>> from sams.tests.testsystems import AblImatinibExplicitAlchemical
-    >>> testsystem = AblImatinibExplicitAlchemical()
-
-    """
-    def __init__(self, **kwargs):
-        super(AblImatinibExplicitAlchemical, self).__init__(**kwargs)
-        self.description = 'Abl:imatinib in explicit solvent alchemical free energy calculation'
-
-        padding = 9.0*unit.angstrom
-        explicit_solvent_model = 'tip3p'
-        setup_path = 'data/abl-imatinib'
-
-        # Create topology, positions, and system.
-        from pkg_resources import resource_filename
-        gaff_xml_filename = resource_filename('sams', 'data/gaff.xml')
-        imatinib_xml_filename = resource_filename('sams', 'data/abl-imatinib/imatinib.xml')
-        system_generators = dict()
-        ffxmls = [gaff_xml_filename, imatinib_xml_filename, 'amber99sbildn.xml', 'tip3p.xml']
-        forcefield_kwargs={ 'nonbondedMethod' : app.CutoffPeriodic, 'nonbondedCutoff' : 9.0 * unit.angstrom, 'implicitSolvent' : None, 'constraints' : app.HBonds, 'rigidWater' : True }
-
-        # Load topologies and positions for all components
-        print('Creating Abl:imatinib test system...')
-        forcefield = app.ForceField(*ffxmls)
-        from simtk.openmm.app import PDBFile, Modeller
-        #pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'inhibitor'))
-        pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'complex'))
-        pdbfile = PDBFile(pdb_filename)
-        modeller = app.Modeller(pdbfile.topology, pdbfile.positions)
-        print('Adding solvent...')
-        modeller.addSolvent(forcefield, model=explicit_solvent_model, padding=padding)
-        self.topology = modeller.getTopology()
-        self.positions = modeller.getPositions()
-        print('Creating system...')
-        self.system = forcefield.createSystem(self.topology, **forcefield_kwargs)
-
-        # DEBUG: Write PDB
-        outfile = open('initial.pdb', 'w')
-        PDBFile.writeFile(self.topology, self.positions, outfile)
-        outfile.close()
-
-        # Add a MonteCarloBarostat
-        temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
-        pressure = 1.0 * unit.atmospheres
-        barostat = openmm.MonteCarloBarostat(pressure, temperature)
-        self.system.addForce(barostat)
-
-        # Create thermodynamic states.
-        print('Creating alchemically-modified system...')
-        alchemical_atoms = range(4266,4335) # Abl:imatinib
-        #alchemical_atoms = range(0,69) # imatinib in solvent
-        from alchemy import AbsoluteAlchemicalFactory
-        factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
-        self.system = factory.createPerturbedSystem()
-        print('Setting up alchemical intermediates...')
-        from sams import ThermodynamicState
-        self.thermodynamic_states = list()
-        nelec = 25
-        nvdw = 25
-        for state in range(nelec+1):
-            parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/float(nelec)) }
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
-        for state in range(1,nvdw+1):
-            parameters = {'lambda_sterics' : (1.0 - float(state)/float(nvdw)), 'lambda_electrostatics' : 0.0 }
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
-
-        # Create SAMS samplers
-        print('Setting up samplers...')
-        from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
-        thermodynamic_state_index = 0 # initial thermodynamic state index
-        thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
-        sampler_state = SamplerState(positions=self.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
-        self.mcmc_sampler.timestep = 2.0 * unit.femtoseconds
-        #self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
-        self.mcmc_sampler.topology = self.topology
-        self.mcmc_sampler.verbose = True
-        self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
-        self.exen_sampler.verbose = True
-        self.sams_sampler = SAMSSampler(self.exen_sampler)
-        self.sams_sampler.verbose = True
-
-        # This test case requires minimization to not explode.
-        minimize(self)
-
-class WaterBoxAlchemical(SAMSTestSystem):
+class WaterBoxAlchemical(AlchemicalSAMSTestSystem):
     """
     Alchemical free energy calculation for TIP3P water in TIP3P water.
 
@@ -563,15 +504,15 @@ class WaterBoxAlchemical(SAMSTestSystem):
 
     """
     def __init__(self, alchemical_protocol='fused', **kwargs):
-        super(WaterBoxAlchemical, self).__init__(**kwargs)
-        self.description = 'TIP3P water in TIP3P water NPT alchemical free energy calculation with %s protocol' % alchemical_protocol
-
         # Create topology, positions, and system.
         from openmmtools.testsystems import WaterBox
         testsystem = WaterBox(nonbondedMethod=app.CutoffPeriodic)
         self.topology = testsystem.topology
         self.positions = testsystem.positions
         self.system = testsystem.system
+        self.temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
+        self.pressure = 1.0 * unit.atmospheres
+        self.alchemical_atoms = range(0,3) # water
 
         # DEBUG: Write PDB
         from simtk.openmm.app import PDBFile
@@ -579,71 +520,89 @@ class WaterBoxAlchemical(SAMSTestSystem):
         PDBFile.writeFile(self.topology, self.positions, outfile)
         outfile.close()
 
-        # Add a MonteCarloBarostat
-        temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
-        pressure = 1.0 * unit.atmospheres
-        barostat = openmm.MonteCarloBarostat(pressure, temperature)
-        self.system.addForce(barostat)
+        super(WaterBoxAlchemical, self).__init__(**kwargs)
+        self.description = 'TIP3P water in TIP3P water NPT alchemical free energy calculation with %s protocol' % alchemical_protocol
 
-        # Create thermodynamic states.
-        print('Creating alchemically-modified system...')
-        temperature = 300 * unit.kelvin
-        pressure = 1.0 * unit.atmospheres
-        alchemical_atoms = range(0,3) # water
-        from alchemy import AbsoluteAlchemicalFactory
-        if alchemical_protocol == 'two-stage':
-            factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
-        elif alchemical_protocol == 'fused':
-            factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False)
-        self.system = factory.createPerturbedSystem()
-        print('Setting up alchemical intermediates...')
-        from sams import ThermodynamicState
-        self.thermodynamic_states = list()
+class AblImatinibExplicitAlchemical(AlchemicalSAMSTestSystem):
+    """
+    Alchemical free energy calculation for Abl:imatinib in explicit solvent.
 
-        if alchemical_protocol == 'two-stage':
-            nstates_per_leg = 10
-            for state in range(nstates_per_leg+1):
-                parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/float(nstates_per_leg)) }
-                self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
-            for state in range(1, nstates_per_leg+1):
-                parameters = {'lambda_sterics' : (1.0 - float(state)/float(nstates_per_leg)), 'lambda_electrostatics' : 0.0 }
-                self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
-        elif alchemical_protocol == 'fused':
-            nstates = 32
-            for state in range(nstates):
-                parameters = {'lambda_sterics' : (1.0 - float(state)/float(nstates-1)) , 'lambda_electrostatics' : (1.0 - float(state)/float(nstates-1)) }
-                self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
-        else:
-            raise Exception("alchemical_protocol '%s' unknown" % alchemical_protocol)
+    Properties
+    ----------
+    topology : simtk.openmm.app.Topology
+        The system Topology
+    system : simtk.openmm.System
+        The OpenMM System to simulate
+    positions : simtk.unit.Quantity of [nparticles,3] with units compatible with nanometers
+        Initial positions
+    thermodynamic_states : list of ThermodynamicState
+        List of thermodynamic states to be used in expanded ensemble sampling
 
-        # Create SAMS samplers
-        print('Setting up samplers...')
-        from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
-        thermodynamic_state_index = 0 # initial thermodynamic state index
-        thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
-        sampler_state = SamplerState(positions=self.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
-        self.mcmc_sampler.timestep = 2.0 * unit.femtoseconds
-        #self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
-        self.mcmc_sampler.topology = self.topology
-        self.mcmc_sampler.nsteps = 500 # reduce number of steps for testing
-        self.mcmc_sampler.verbose = True
-        self.exen_sampler = ExpandedEnsembleSampler(self.mcmc_sampler, self.thermodynamic_states)
-        self.exen_sampler.verbose = True
-        self.sams_sampler = SAMSSampler(self.exen_sampler)
-        self.sams_sampler.verbose = True
+    Examples
+    --------
+
+    >>> from sams.tests.testsystems import AblImatinibExplicitAlchemical
+    >>> testsystem = AblImatinibExplicitAlchemical()
+
+    """
+    def __init__(self, **kwargs):
+        self.temperature = 300 * unit.kelvin
+        self.pressure = 1.0 * unit.atmospheres
+
+        padding = 9.0*unit.angstrom
+        explicit_solvent_model = 'tip3p'
+        setup_path = 'data/abl-imatinib'
+
+        # Create topology, positions, and system.
+        from pkg_resources import resource_filename
+        gaff_xml_filename = resource_filename('sams', 'data/gaff.xml')
+        imatinib_xml_filename = resource_filename('sams', 'data/abl-imatinib/imatinib.xml')
+        system_generators = dict()
+        ffxmls = [gaff_xml_filename, imatinib_xml_filename, 'amber99sbildn.xml', 'tip3p.xml']
+        forcefield_kwargs={ 'nonbondedMethod' : app.CutoffPeriodic, 'nonbondedCutoff' : 9.0 * unit.angstrom, 'implicitSolvent' : None, 'constraints' : app.HBonds, 'rigidWater' : True }
+
+        # Load topologies and positions for all components
+        print('Creating Abl:imatinib test system...')
+        forcefield = app.ForceField(*ffxmls)
+        from simtk.openmm.app import PDBFile, Modeller
+        #pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'inhibitor'))
+        pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'complex'))
+        pdbfile = PDBFile(pdb_filename)
+        modeller = app.Modeller(pdbfile.topology, pdbfile.positions)
+        print('Adding solvent...')
+        initial_time = time.time()
+        modeller.addSolvent(forcefield, model=explicit_solvent_model, padding=padding)
+        final_time = time.time()
+        elapsed_time = final_time - initial_time
+        nadded = (len(modeller.positions) - len(pdbfile.positions)) / 3
+        print('Adding solvent took %.3f s (%d molecules added)' % (elapsed_time, nadded))
+        self.topology = modeller.getTopology()
+        self.positions = modeller.getPositions()
+        print('Creating system...')
+        self.system = forcefield.createSystem(self.topology, **forcefield_kwargs)
+        self.alchemical_atoms = range(4266,4335) # Abl:imatinib
+
+        # DEBUG: Write PDB
+        outfile = open('initial.pdb', 'w')
+        PDBFile.writeFile(self.topology, self.positions, outfile)
+        outfile.close()
+
+        super(AblImatinibExplicitAlchemical, self).__init__(**kwargs)
+        self.description = 'Abl:imatinib in explicit solvent alchemical free energy calculation'
 
         # This test case requires minimization to not explode.
-        #minimize(self)
+        minimize(self)
 
 def test_testsystems():
     np.set_printoptions(linewidth=130, precision=3)
     # TODO: Automatically discover subclasses of SAMSTestSystem
     niterations = 5
     import sams
-    for testsystem_name in ['AblImatinibExplicitAlchemical', 'AlanineDipeptideVacuumSimulatedTempering', 'AlanineDipeptideExplicitSimulatedTempering', 'AlanineDipeptideVacuumAlchemical', 'AlanineDipeptideExplicitAlchemical']:
+    for testsystem_name in ['AlanineDipeptideVacuumSimulatedTempering', 'AlanineDipeptideExplicitSimulatedTempering', 'AlanineDipeptideVacuumAlchemical', 'AlanineDipeptideExplicitAlchemical', 'WaterBoxAlchemical', 'AblImatinibExplicitAlchemical']:
         testsystem = getattr(sams.tests.testsystems, testsystem_name)
         test = testsystem()
+        # Reduce number of steps for testing
+        test.mcmc_sampler.nsteps = 5
         f = partial(test.mcmc_sampler.run, niterations)
         f.description = 'Testing ' + test.description + ' MCMC simulation'
         yield f

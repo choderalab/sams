@@ -164,9 +164,8 @@ class ThermodynamicState(object):
         if self.pressure:
             forces = { self.system.getForce(index).__class__.__name__ : self.system.getForce(index) for index in range(self.system.getNumForces()) }
             barostat = forces['MonteCarloBarostat']
-            # TODO: Make sure this is the correct way to set temperature/pressure
-            barostat.setTemperature(self.temperature)
             context.setParameter(barostat.Pressure(), self.pressure.value_in_unit_system(unit.md_unit_system))
+            context.setParameter(barostat.Temperature(), self.temperature.value_in_unit_system(unit.md_unit_system)) # OpenMM 7.1.0
 
         # Set Context parameters
         if self.parameters is not None:
@@ -1023,6 +1022,7 @@ class SAMSSampler(object):
         initial_time = time.time()
 
         if self.verbose:
+            print('')
             print("=" * 80)
             print("SAMS sampler iteration %5d" % self.iteration)
 
