@@ -53,14 +53,15 @@ def minimize(testsystem):
 
     """
     print("Minimizing '%s'..." % testsystem.description)
+    timestep = 1.0 * unit.femtoseconds
     collision_rate = 20.0 / unit.picoseconds
     temperature = 300 * unit.kelvin
-    integrator = openmm.LangevinIntegrator(1.0 * unit.femtoseconds, collision_rate, temperature)
+    integrator = openmm.LangevinIntegrator(temperature, collision_rate, timestep)
     context = openmm.Context(testsystem.system, integrator)
     context.setPositions(testsystem.positions)
     print ("Initial energy is %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     TOL = 1.0
-    MAX_STEPS = 100
+    MAX_STEPS = 500
     openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
     print ("Final energy is   %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     # Take some steps.
@@ -479,8 +480,8 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         print('Creating Abl:imatinib test system...')
         forcefield = app.ForceField(*ffxmls)
         from simtk.openmm.app import PDBFile, Modeller
-        pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'inhibitor'))
-        #pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'complex'))
+        #pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'inhibitor'))
+        pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'complex'))
         pdbfile = PDBFile(pdb_filename)
         modeller = app.Modeller(pdbfile.topology, pdbfile.positions)
         print('Adding solvent...')
@@ -496,28 +497,28 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         outfile.close()
 
         # Add a MonteCarloBarostat
-        #temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
-        #pressure = 1.0 * unit.atmospheres
-        #barostat = openmm.MonteCarloBarostat(pressure, temperature)
-        #self.system.addForce(barostat)
+        temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
+        pressure = 1.0 * unit.atmospheres
+        barostat = openmm.MonteCarloBarostat(pressure, temperature)
+        self.system.addForce(barostat)
 
         # Create thermodynamic states.
         print('Creating alchemically-modified system...')
-        temperature = 300 * unit.kelvin
-        pressure = 1.0 * unit.atmospheres
-        #alchemical_atoms = range(4266,4335) # Abl:imatinib
-        alchemical_atoms = range(0,69) # Abl:imatinib
+        alchemical_atoms = range(4266,4335) # Abl:imatinib
+        #alchemical_atoms = range(0,69) # imatinib in solvent
         from alchemy import AbsoluteAlchemicalFactory
         factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
         self.system = factory.createPerturbedSystem()
         print('Setting up alchemical intermediates...')
         from sams import ThermodynamicState
         self.thermodynamic_states = list()
-        for state in range(251):
-            parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/250.0) }
+        nelec = 25
+        nvdw = 25
+        for state in range(nelec+1):
+            parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/float(nelec)) }
             self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
-        for state in range(1,251):
-            parameters = {'lambda_sterics' : (1.0 - float(state)/250.0), 'lambda_electrostatics' : 0.0 }
+        for state in range(1,nvdw+1):
+            parameters = {'lambda_sterics' : (1.0 - float(state)/float(nvdw)), 'lambda_electrostatics' : 0.0 }
             self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
 
         # Create SAMS samplers
@@ -527,6 +528,7 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
         sampler_state = SamplerState(positions=self.positions)
         self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
+        self.mcmc_sampler.timestep = 2.0 * unit.femtoseconds
         #self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
         self.mcmc_sampler.verbose = True
@@ -536,7 +538,7 @@ class AblImatinibExplicitAlchemical(SAMSTestSystem):
         self.sams_sampler.verbose = True
 
         # This test case requires minimization to not explode.
-        #minimize(self)
+        minimize(self)
 
 class WaterBoxAlchemical(SAMSTestSystem):
     """
@@ -682,10 +684,10 @@ if __name__ == '__main__':
     #testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
 
-    testsystem.exen_sampler.update_scheme = 'local-jump'
-    testsystem.mcmc_sampler.nsteps = 500
+    testsystem.exen_sampler.update_scheme = 'global-jump'
+    testsystem.mcmc_sampler.nsteps = 2500
     testsystem.exen_sampler.locality = 10
-    testsystem.sams_sampler.update_method = 'optimal'
-    niterations = 5000
+    testsystem.sams_sampler.update_method = 'rao-blackwellized'
+    niterations = 20000
     #testsystem.sams_sampler.mbar_update_interval = 50
     testsystem.sams_sampler.run(niterations)
