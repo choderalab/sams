@@ -62,7 +62,7 @@ def minimize(testsystem):
     context.setPositions(testsystem.positions)
     print ("Initial energy is %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     TOL = 1.0
-    MAX_STEPS = 50
+    MAX_STEPS = 500
     openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
     print ("Final energy is   %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     # Take some steps.
@@ -536,7 +536,7 @@ def test_testsystems():
     niterations = 2
     import sams
     # TODO: Automatically discover subclasses of SAMSTestSystem that are not abstract base classes
-    for testsystem_name in ['AlanineDipeptideVacuumSimulatedTempering', 'AlanineDipeptideExplicitSimulatedTempering', 'AlanineDipeptideVacuumAlchemical', 'AlanineDipeptideExplicitAlchemical', 'WaterBoxAlchemical', 'HostGuestAlchemical', 'AblImatinibExplicitAlchemical']:
+    for testsystem_name in ['AlanineDipeptideVacuumSimulatedTempering', 'AlanineDipeptideExplicitSimulatedTempering', 'AlanineDipeptideVacuumAlchemical', 'AlanineDipeptideExplicitAlchemical', 'WaterBoxAlchemical', 'HostGuestAlchemical']:
         testsystem = getattr(sams.tests.testsystems, testsystem_name)
         test = testsystem()
         # Reduce number of steps for testing

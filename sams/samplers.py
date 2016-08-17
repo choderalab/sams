@@ -711,16 +711,20 @@ class ExpandedEnsembleSampler(object):
             proposed_neighborhood_size = len(proposed_neighborhood)
             # Compute state log weights.
             self.neighborhood = [current_state_index, proposed_state_index]
+            log_Gamma_j_L = - float(proposed_neighborhood) # log probability of proposing return
+            log_Gamma_L_j = - float(neighborhood_size) # log probability of proposing new state
+            L = current_state_index
             for j in self.neighborhood:
                 self.u_k[j] = self.thermodynamic_states[j].reduced_potential(self.sampler.context)
-                self.log_P_k[j] = self.log_weights[j] - self.u_k[j]
-            self.log_P_k[self.neighborhood] -= logsumexp(self.log_P_k[self.neighborhood])
-            P_k = np.exp(self.log_P_k[self.neighborhood])
-            # Accept or reject according to Metropolis criterion.
-            log_P_accept = np.log( float(neighborhood_size)/float(proposed_neighborhood_size) ) + self.log_P_k[proposed_state_index] - self.log_P_k[current_state_index]
-            if (log_P_accept >= 0.0) or (np.random.rand() < np.exp(log_P_accept)):
-                self.thermodynamic_state_index = proposed_state_index
+                if j != L:
+                    self.log_P_k[j] = log_Gamma_L_j + min(0.0, log_Gamma_j_L - log_Gamma_L_j + (self.log_weights[j] - self.u_k[j]) - (self.log_weights[L] - self.u_k[L]))
+            P_k[self.neighborhood] = np.exp(self.log_P_k[self.neighborhood])
+            # Compute probability to return to current state L
+            P_k[L] = 0.0
+            P_k[L] = 1.0 - P_k[self.neighborhood].sum()
+            self.log_P_k[L] = np.log(P_k[L])
             # Update context.
+            self.thermodynamic_state_index = np.random.choice(self.neighborhood, p=P_k)
             self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
         elif self.update_scheme == 'global-jump':
             # Compute unnormalized log probabilities for all thermodynamic states
