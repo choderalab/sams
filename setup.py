@@ -95,6 +95,8 @@ setup(name='sams',
         'parmed',
         'openmoltools',
         'alchemy >=1.1.3',
-        'openmmtools'
+        'openmmtools',
+        'matplotlib',
+        'seaborn'
         ],
       )
