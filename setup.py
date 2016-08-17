@@ -87,12 +87,13 @@ setup(name='sams',
       zip_safe=False,
       ext_modules=extensions,
       install_requires=[
-        'openmm >=7.0',
         'numpy',
         'scipy',
-        'numexpr',
+        'pymbar',
+        'openmm',
+        'parmed',
         'openmoltools',
         'alchemy >=1.1.3',
-        'numexpr',
+        'openmmtools'
         ],
       )
