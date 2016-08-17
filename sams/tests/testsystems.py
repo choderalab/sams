@@ -536,7 +536,7 @@ def test_testsystems():
     niterations = 2
     import sams
     # TODO: Automatically discover subclasses of SAMSTestSystem that are not abstract base classes
-    for testsystem_name in ['AlanineDipeptideVacuumSimulatedTempering', 'AlanineDipeptideExplicitSimulatedTempering', 'AlanineDipeptideVacuumAlchemical', 'AlanineDipeptideExplicitAlchemical', 'WaterBoxAlchemical', 'AblImatinibExplicitAlchemical']:
+    for testsystem_name in ['AlanineDipeptideVacuumSimulatedTempering', 'AlanineDipeptideExplicitSimulatedTempering', 'AlanineDipeptideVacuumAlchemical', 'AlanineDipeptideExplicitAlchemical', 'WaterBoxAlchemical', 'HostGuestAlchemical', 'AblImatinibExplicitAlchemical']:
         testsystem = getattr(sams.tests.testsystems, testsystem_name)
         test = testsystem()
         # Reduce number of steps for testing

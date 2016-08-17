@@ -35,6 +35,8 @@ env:
   global:
     - ORGNAME="omnia"
     - PACKAGENAME="sams"
+    # Testing
+    - OPENMM_CPU_THREADS="2"
     # OpenEye toolkit
     - OE_LICENSE="$HOME/oe_license.txt"
     - OPENEYE_CHANNEL="-i https://pypi.anaconda.org/openeye/channel/main/simple"
