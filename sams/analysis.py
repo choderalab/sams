@@ -52,9 +52,11 @@ def analyze(netcdf_filename, testsystem, pdf_filename):
             plt.plot(testsystem.logZ, 'ro')
             print testsystem.logZ
 
+        title_fontsize = 7
+
         logZ = ncfile.variables['logZ'][-2,:]
         plt.plot(logZ, 'ko')
-        plt.title(testsystem.description)
+        plt.title(testsystem.description, fontsize=title_fontsize)
         plt.xlabel('state index $j$')
         plt.ylabel('$\zeta^{(t)}$')
         plt.axis([0, nstates-1, min(logZ), max(logZ)])
@@ -66,7 +68,7 @@ def analyze(netcdf_filename, testsystem, pdf_filename):
         plt.figure(figsize=(6, 6))
         state_index = ncfile.variables['state_index'][:]
         plt.plot(state_index, '.')
-        plt.title(testsystem.description)
+        plt.title(testsystem.description, fontsize=title_fontsize)
         plt.xlabel('iteration $t$')
         plt.ylabel('state index')
         plt.axis([0, nsamples, 0, nstates-1])
@@ -80,7 +82,7 @@ def analyze(netcdf_filename, testsystem, pdf_filename):
             plt.plot(M, ':')
         logZ = ncfile.variables['logZ'][:,:]
         plt.plot(logZ[:,:], '-')
-        plt.title(testsystem.description)
+        plt.title(testsystem.description, fontsize=title_fontsize)
         plt.xlabel('iteration $t$')
         plt.ylabel('$\zeta^{(t)}$')
         plt.axis([0, nsamples, logZ.min(), logZ.max()])
