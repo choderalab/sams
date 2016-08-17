@@ -633,14 +633,14 @@ class ExpandedEnsembleSampler(object):
         log_weights : dict of object : float
             Log weights to use for expanded ensemble biases
         update_scheme : str, optional, default='global-jump'
-            Thermodynamic state update scheme, one of ['neighbor', 'global-jump', 'local-jump', 'restricted-range']
+            Thermodynamic state update scheme, one of ['global-jump', 'local-jump', 'restricted-range']
         locality : int, optional, default=1
             Number of neighboring states on either side to consider for local update schemes
 
         """
-        supported_update_schemes = ['neighbor', 'local-jump', 'global-jump']
-        if update_scheme not in supported_update_schemes:
-            raise Exception("Update scheme '%s' not in list of supported update schemes: %s" % (update_scheme, str(supported_update_schemes)))
+        self.supported_update_schemes = ['local-jump', 'global-jump', 'restricted-range']
+        if update_scheme not in self.supported_update_schemes:
+            raise Exception("Update scheme '%s' not in list of supported update schemes: %s" % (update_scheme, str(self.supported_update_schemes)))
 
         self.sampler = sampler
         self.thermodynamic_states = thermodynamic_states
@@ -700,25 +700,23 @@ class ExpandedEnsembleSampler(object):
         self.log_P_k = np.zeros([self.nstates], np.float64)
         if self.update_scheme == 'local-jump':
             # Determine current neighborhood.
-            neighborhood = range(max(0, current_state_index - self.locality), min(self.nstates, current_state_index + self.locality))
-            neighborhood.remove(current_state_index) # remove current state
+            neighborhood = range(max(0, current_state_index - self.locality), min(self.nstates, current_state_index + self.locality + 1))
             neighborhood_size = len(neighborhood)
             # Propose a move from the current neighborhood.
             proposed_state_index = np.random.choice(neighborhood, p=np.ones([len(neighborhood)], np.float64) / float(neighborhood_size))
             # Determine neighborhood for proposed state.
-            proposed_neighborhood = range(max(0, proposed_state_index - self.locality), min(self.nstates, proposed_state_index + self.locality))
-            proposed_neighborhood.remove(proposed_state_index)
+            proposed_neighborhood = range(max(0, proposed_state_index - self.locality), min(self.nstates, proposed_state_index + self.locality + 1))
             proposed_neighborhood_size = len(proposed_neighborhood)
             # Compute state log weights.
-            self.neighborhood = [current_state_index, proposed_state_index]
-            log_Gamma_j_L = - float(proposed_neighborhood) # log probability of proposing return
-            log_Gamma_L_j = - float(neighborhood_size) # log probability of proposing new state
+            log_Gamma_j_L = - float(proposed_neighborhood_size) # log probability of proposing return
+            log_Gamma_L_j = - float(neighborhood_size)          # log probability of proposing new state
             L = current_state_index
+            self.neighborhood = neighborhood
             for j in self.neighborhood:
                 self.u_k[j] = self.thermodynamic_states[j].reduced_potential(self.sampler.context)
                 if j != L:
                     self.log_P_k[j] = log_Gamma_L_j + min(0.0, log_Gamma_j_L - log_Gamma_L_j + (self.log_weights[j] - self.u_k[j]) - (self.log_weights[L] - self.u_k[L]))
-            P_k[self.neighborhood] = np.exp(self.log_P_k[self.neighborhood])
+            P_k = np.exp(self.log_P_k[self.neighborhood])
             # Compute probability to return to current state L
             P_k[L] = 0.0
             P_k[L] = 1.0 - P_k[self.neighborhood].sum()
@@ -739,7 +737,7 @@ class ExpandedEnsembleSampler(object):
             self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
         elif self.update_scheme == 'restricted-range':
             # Propose new state from current neighborhood.
-            self.neighborhood = range(max(0, current_state_index - self.locality), min(self.nstates, current_state_index + self.locality))
+            self.neighborhood = range(max(0, current_state_index - self.locality), min(self.nstates, current_state_index + self.locality + 1))
             for j in self.neighborhood:
                 self.u_k[j] = self.thermodynamic_states[j].reduced_potential(self.sampler.context)
                 self.log_P_k[j] = self.log_weights[j] - self.u_k[j]
@@ -747,7 +745,7 @@ class ExpandedEnsembleSampler(object):
             P_k = np.exp(self.log_P_k[self.neighborhood])
             proposed_state_index = np.random.choice(self.neighborhood, p=P_k)
             # Determine neighborhood of proposed state.
-            proposed_neighborhood = range(max(0, proposed_state_index - self.locality), min(self.nstates, proposed_state_index + self.locality))
+            proposed_neighborhood = range(max(0, proposed_state_index - self.locality), min(self.nstates, proposed_state_index + self.locality + 1))
             proposed_log_P_k = np.zeros([self.nstates], np.float64)
             for j in proposed_neighborhood:
                 if j not in self.neighborhood:
@@ -882,9 +880,9 @@ class SAMSSampler(object):
 
         """
         # Check input arguments.
-        supported_update_methods = ['optimal', 'rao-blackwellized']
-        if update_method not in supported_update_methods:
-            raise Exception("Update method '%s' not in supported update schemes: %s" % (update_method, str(supported_update_methods)))
+        self.supported_update_methods = ['optimal', 'rao-blackwellized']
+        if update_method not in self.supported_update_methods:
+            raise Exception("Update method '%s' not in supported update schemes: %s" % (update_method, str(self.supported_update_methods)))
 
         # Keep copies of initializing arguments.
         self.sampler = sampler
@@ -970,7 +968,7 @@ class SAMSSampler(object):
             neighborhood = self.sampler.neighborhood # indices of states for expanded ensemble update
             log_P_k = self.sampler.log_P_k # log probabilities of selecting states in neighborhood during update
             log_pi_k = self.log_target_probabilities
-            self.logZ[neighborhood] += gamma * np.exp(log_P_k - log_pi_k[neighborhood])
+            self.logZ[neighborhood] += gamma * np.exp(log_P_k[neighborhood] - log_pi_k[neighborhood])
         else:
             raise Exception("SAMS update method '%s' unknown." % self.update_method)
 
