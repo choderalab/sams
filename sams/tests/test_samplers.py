@@ -30,6 +30,7 @@ def test_sampler_options():
     test = WaterBoxAlchemical()
     testsystem_name = test.__class__.__name__
     niterations = 5 # number of iterations to run
+    test.mcmc_sampler.nsteps = 50
 
     # Test MCMCSampler sampler options.
     f = partial(test.mcmc_sampler.run, niterations)
