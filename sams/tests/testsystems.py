@@ -595,14 +595,14 @@ class AblImatinibExplicitAlchemical(AlchemicalSAMSTestSystem):
 
 def test_testsystems():
     np.set_printoptions(linewidth=130, precision=3)
-    # TODO: Automatically discover subclasses of SAMSTestSystem
-    niterations = 5
+    niterations = 2
     import sams
+    # TODO: Automatically discover subclasses of SAMSTestSystem that are not abstract base classes
     for testsystem_name in ['AlanineDipeptideVacuumSimulatedTempering', 'AlanineDipeptideExplicitSimulatedTempering', 'AlanineDipeptideVacuumAlchemical', 'AlanineDipeptideExplicitAlchemical', 'WaterBoxAlchemical', 'AblImatinibExplicitAlchemical']:
         testsystem = getattr(sams.tests.testsystems, testsystem_name)
         test = testsystem()
         # Reduce number of steps for testing
-        test.mcmc_sampler.nsteps = 5
+        test.mcmc_sampler.nsteps = 2
         f = partial(test.mcmc_sampler.run, niterations)
         f.description = 'Testing ' + test.description + ' MCMC simulation'
         yield f
