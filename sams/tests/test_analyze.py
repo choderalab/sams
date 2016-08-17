@@ -33,6 +33,7 @@ def test_analysis():
     test = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
     testsystem_name = test.__class__.__name__
     niterations = 20 # number of iterations to run
+    test.mcmc_sampler.nsteps = 50
 
     # Test SAMSSampler.
     test.sams_sampler.run(niterations)
