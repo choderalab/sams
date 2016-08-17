@@ -1,6 +1,27 @@
 language: c
 sudo: false
 
+# addons needed for matplotlib
+addons:
+  apt:
+    packages:
+      - inkscape
+      - libav-tools
+      - gdb
+      - mencoder
+      - dvipng
+      - pgf
+      - lmodern
+      - cm-super
+      - texlive-latex-base
+      - texlive-latex-extra
+      - texlive-fonts-recommended
+      - texlive-latex-recommended
+      - texlive-xetex
+      - graphviz
+      - libgeos-dev
+      - otf-freefont
+
 branches:
   only:
     - master
