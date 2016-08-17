@@ -1,9 +1,5 @@
 """
-Samplers for perses automated molecular design.
-
-TODO:
-* Refactor tests into a test class so that AlanineDipeptideSAMS test system only needs to be constructed once for a battery of tests.
-* Generalize tests of samplers to iterate over all PersesTestSystem subclasses
+Test SAMS sampler options.
 
 """
 
