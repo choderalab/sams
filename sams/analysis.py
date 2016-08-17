@@ -50,7 +50,7 @@ def analyze(netcdf_filename, testsystem, pdf_filename):
         if hasattr(testsystem, 'logZ'):
             plt.hold(True)
             plt.plot(testsystem.logZ, 'ro')
-            print testsystem.logZ
+            print(testsystem.logZ)
 
         title_fontsize = 7
 

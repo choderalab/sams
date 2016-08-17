@@ -716,11 +716,13 @@ class ExpandedEnsembleSampler(object):
                 self.u_k[j] = self.thermodynamic_states[j].reduced_potential(self.sampler.context)
                 if j != L:
                     self.log_P_k[j] = log_Gamma_L_j + min(0.0, log_Gamma_j_L - log_Gamma_L_j + (self.log_weights[j] - self.u_k[j]) - (self.log_weights[L] - self.u_k[L]))
-            P_k = np.exp(self.log_P_k[self.neighborhood])
+            P_k = np.zeros([self.nstates], np.float64)
+            P_k[self.neighborhood] = np.exp(self.log_P_k[self.neighborhood])
             # Compute probability to return to current state L
             P_k[L] = 0.0
             P_k[L] = 1.0 - P_k[self.neighborhood].sum()
             self.log_P_k[L] = np.log(P_k[L])
+            P_k = P_k[self.neighborhood]
             # Update context.
             self.thermodynamic_state_index = np.random.choice(self.neighborhood, p=P_k)
             self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)

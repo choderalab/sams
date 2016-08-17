@@ -60,15 +60,15 @@ def minimize(testsystem):
     integrator = openmm.LangevinIntegrator(temperature, collision_rate, timestep)
     context = openmm.Context(testsystem.system, integrator)
     context.setPositions(testsystem.positions)
-    print ("Initial energy is %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    print("Initial energy is %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     TOL = 1.0
     MAX_STEPS = 500
     openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
-    print ("Final energy is   %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    print("Final energy is   %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     # Take some steps.
     nsteps = 5
     integrator.step(nsteps)
-    print ("After %d steps    %12.3f kcal/mol" % (nsteps, context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    print("After %d steps    %12.3f kcal/mol" % (nsteps, context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     # Update positions.
     testsystem.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
     testsystem.mcmc_sampler.sampler_state.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
