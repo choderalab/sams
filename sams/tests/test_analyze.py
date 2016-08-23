@@ -28,12 +28,12 @@ def test_analysis():
     Test analysis.
 
     """
-    from sams.tests.testsystems import WaterBoxAlchemical
+    from sams.tests.testsystems import AlanineDipeptideVacuumSimulatedTempering
     netcdf_filename = 'output.nc'
-    test = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
+    test = AlanineDipeptideVacuumSimulatedTempering(netcdf_filename=netcdf_filename)
     testsystem_name = test.__class__.__name__
     niterations = 20 # number of iterations to run
-    test.mcmc_sampler.nsteps = 50
+    test.mcmc_sampler.nsteps = 5
 
     # Test SAMSSampler.
     test.sams_sampler.run(niterations)
