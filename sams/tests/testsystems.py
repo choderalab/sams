@@ -329,7 +329,7 @@ class AlchemicalSAMSTestSystem(SAMSTestSystem):
         Pressure
 
     """
-    def __init__(self, alchemical_protocol='two-phase', nlambda=500, **kwargs):
+    def __init__(self, alchemical_protocol='two-phase', nlambda=40, **kwargs):
         """
         Create an alchemical free energy calculation SAMS test system from the provided system.
 
@@ -337,7 +337,7 @@ class AlchemicalSAMSTestSystem(SAMSTestSystem):
         ----------
         alchemical_protocol : str, optional, default='two-phase'
             Alchemical protocol scheme to use. ['two-phase', 'fused']
-        nlambda : int, optional, default=50
+        nlambda : int, optional, default=40
             Number of alchemical states.
 
         """
@@ -405,6 +405,12 @@ class AlchemicalSAMSTestSystem(SAMSTestSystem):
         self.exen_sampler.verbose = True
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
+
+        # DEBUG: Write PDB of initial frame
+        from simtk.openmm.app import PDBFile
+        outfile = open('initial.pdb', 'w')
+        PDBFile.writeFile(self.topology, self.positions, outfile)
+        outfile.close()
 
 class AlanineDipeptideVacuumAlchemical(AlchemicalSAMSTestSystem):
     """
@@ -479,6 +485,45 @@ class HostGuestAlchemical(AlchemicalSAMSTestSystem):
         super(HostGuestAlchemical, self).__init__(**kwargs)
         self.description = 'CB7:B2 host-guest alchemical free energy calculation with %s protocol' % self.alchemical_protocol
 
+class AblImatinibVacuumAlchemical(AlchemicalSAMSTestSystem):
+    """
+    Alchemical free energy calculation for Abl:imatinib in vacuum
+    """
+    def __init__(self, **kwargs):
+        self.temperature = 300 * unit.kelvin
+        self.pressure = 1.0 * unit.atmospheres
+
+        padding = 9.0*unit.angstrom
+        setup_path = 'data/abl-imatinib'
+
+        # Create topology, positions, and system.
+        from pkg_resources import resource_filename
+        gaff_xml_filename = resource_filename('sams', 'data/gaff.xml')
+        imatinib_xml_filename = resource_filename('sams', 'data/abl-imatinib/imatinib.xml')
+        system_generators = dict()
+        ffxmls = [gaff_xml_filename, imatinib_xml_filename, 'amber99sbildn.xml', 'tip3p.xml']
+        forcefield_kwargs={ 'nonbondedMethod' : app.NoCutoff, 'nonbondedCutoff' : 9.0 * unit.angstrom, 'implicitSolvent' : None, 'constraints' : app.HBonds, 'rigidWater' : True }
+
+        # Load topologies and positions for all components
+        print('Creating Abl:imatinib test system...')
+        forcefield = app.ForceField(*ffxmls)
+        from simtk.openmm.app import PDBFile, Modeller
+        #pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'inhibitor'))
+        pdb_filename = resource_filename('sams', os.path.join(setup_path, '%s.pdb' % 'complex'))
+        pdbfile = PDBFile(pdb_filename)
+        modeller = app.Modeller(pdbfile.topology, pdbfile.positions)
+        self.topology = modeller.getTopology()
+        self.positions = modeller.getPositions()
+        print('Creating system...')
+        self.system = forcefield.createSystem(self.topology, **forcefield_kwargs)
+        self.alchemical_atoms = range(4266,4335) # Abl:imatinib
+
+        super(AblImatinibVacuumAlchemical, self).__init__(**kwargs)
+        self.description = 'Abl:imatinib in vacuum alchemical free energy calculation'
+
+        # This test case requires minimization to not explode.
+        minimize(self)
+
 class AblImatinibExplicitAlchemical(AlchemicalSAMSTestSystem):
     """
     Alchemical free energy calculation for Abl:imatinib in explicit solvent.
@@ -519,11 +564,6 @@ class AblImatinibExplicitAlchemical(AlchemicalSAMSTestSystem):
         print('Creating system...')
         self.system = forcefield.createSystem(self.topology, **forcefield_kwargs)
         self.alchemical_atoms = range(4266,4335) # Abl:imatinib
-
-        # DEBUG: Write PDB
-        outfile = open('initial.pdb', 'w')
-        PDBFile.writeFile(self.topology, self.positions, outfile)
-        outfile.close()
 
         super(AblImatinibExplicitAlchemical, self).__init__(**kwargs)
         self.description = 'Abl:imatinib in explicit solvent alchemical free energy calculation'
@@ -575,18 +615,19 @@ if __name__ == '__main__':
 
     #testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
 
+    testsystem = AblImatinibVacuumAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
-    testsystem = HostGuestAlchemical(netcdf_filename=netcdf_filename)
+    #testsystem = HostGuestAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitAlchemical()
     #testsystem = AlanineDipeptideVacuumSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
 
     testsystem.exen_sampler.update_scheme = 'global-jump'
-    testsystem.mcmc_sampler.nsteps = 2500
+    testsystem.mcmc_sampler.nsteps = 500
     testsystem.exen_sampler.locality = 5
     testsystem.sams_sampler.update_method = 'rao-blackwellized'
-    niterations = 5000
+    niterations = 1000
     #testsystem.sams_sampler.mbar_update_interval = 50
     testsystem.sams_sampler.run(niterations)
 
