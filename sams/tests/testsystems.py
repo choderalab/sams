@@ -329,7 +329,7 @@ class AlchemicalSAMSTestSystem(SAMSTestSystem):
         Pressure
 
     """
-    def __init__(self, alchemical_protocol='two-phase', nlambda=40, **kwargs):
+    def __init__(self, alchemical_protocol='two-phase', nlambda=500, **kwargs):
         """
         Create an alchemical free energy calculation SAMS test system from the provided system.
 
@@ -615,9 +615,9 @@ if __name__ == '__main__':
 
     #testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
 
-    testsystem = AblImatinibVacuumAlchemical(netcdf_filename=netcdf_filename)
+    #testsystem = AblImatinibVacuumAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
-    #testsystem = HostGuestAlchemical(netcdf_filename=netcdf_filename)
+    testsystem = HostGuestAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitAlchemical()
     #testsystem = AlanineDipeptideVacuumSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
@@ -627,10 +627,11 @@ if __name__ == '__main__':
     testsystem.mcmc_sampler.nsteps = 500
     testsystem.exen_sampler.locality = 5
     testsystem.sams_sampler.update_method = 'rao-blackwellized'
-    niterations = 1000
+    niterations = 150
     #testsystem.sams_sampler.mbar_update_interval = 50
     testsystem.sams_sampler.run(niterations)
 
     # Test analysis
     from sams.analysis import analyze
+    netcdf_filename = 'output.nc'
     analyze(netcdf_filename, testsystem, 'analyze.pdf')

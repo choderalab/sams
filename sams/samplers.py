@@ -940,12 +940,22 @@ class SAMSSampler(object):
     def update_logZ_estimates(self):
         """
         Update the logZ estimates according to selected SAMS update method.
+
+        References
+        ----------
+        [1] http://www.stat.rutgers.edu/home/ztan/Publication/SAMS_redo4.pdf
+
         """
         initial_time = time.time()
 
-        gamma0 = 1.0 / self.sampler.nstates
+        current_state = self.sampler.thermodynamic_state_index
+        log_pi_k = self.log_target_probabilities
+        pi_k = np.exp(self.log_target_probabilities)
+        log_P_k = self.sampler.log_P_k # log probabilities of selecting states in neighborhood during update
+
+        gamma0 = 1.0
         if self.update_stages == 'one-stage':
-            gamma = gamma0 / float(self.iteration+1)
+            gamma = gamma0 / float(self.iteration+1) # prefactor in Eq. 9 and 12 from [1]
         elif self.update_stages == 'two-stage':
             gamma = gamma0
             if hasattr(self, 'second_stage_iteration_start'):
@@ -953,23 +963,27 @@ class SAMSSampler(object):
                 t0 = self.second_stage_iteration_start
                 gamma = 1.0 / float(self.iteration - t0 + 1./gamma0)
             else:
-                # Check if we have visited all states yet.
+                # Use first stage scheme.
+                beta_factor = 0.6
+                t = self.iteration + 1.0
+                gamma = min(pi_k[current_state], t**(-beta_factor)) # Eq. 15
+                # Check if all state histograms are "flat" within 20% so we can enter the second stage
+                RELATIVE_HISTOGRAM_ERROR_THRESHOLD = 0.20
                 N_k = self.sampler.number_of_state_visits[:]
-                if np.all(N_k > 0):
+                empirical_pi_k = N_k[:] / N_k.sum()
+                pi_k = np.exp(self.log_target_probabilities)
+                relative_error_k = np.abs(pi_k - empirical_pi_k) / pi_k
+                if np.all(relative_error_k < RELATIVE_HISTOGRAM_ERROR_THRESHOLD):
                     self.second_stage_iteration_start = self.iteration
         else:
             raise Exception("update_stages method '%s' unknown" % self.update_stages)
 
         if self.update_method == 'optimal':
             # Based on Eq. 9 of Ref. [1]
-            current_state = self.sampler.thermodynamic_state_index
-            log_pi_k = self.log_target_probabilities
             self.logZ[current_state] += gamma * np.exp(-log_pi_k[current_state])
         elif self.update_method == 'rao-blackwellized':
             # Based on Eq. 12 of Ref [1]
             neighborhood = self.sampler.neighborhood # indices of states for expanded ensemble update
-            log_P_k = self.sampler.log_P_k # log probabilities of selecting states in neighborhood during update
-            log_pi_k = self.log_target_probabilities
             self.logZ[neighborhood] += gamma * np.exp(log_P_k[neighborhood] - log_pi_k[neighborhood])
         else:
             raise Exception("SAMS update method '%s' unknown." % self.update_method)
