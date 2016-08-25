@@ -627,7 +627,7 @@ if __name__ == '__main__':
     testsystem.mcmc_sampler.nsteps = 500
     testsystem.exen_sampler.locality = 5
     testsystem.sams_sampler.update_method = 'rao-blackwellized'
-    niterations = 150
+    niterations = 1000
     #testsystem.sams_sampler.mbar_update_interval = 50
     testsystem.sams_sampler.run(niterations)
 

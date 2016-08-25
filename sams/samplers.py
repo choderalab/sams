@@ -957,7 +957,6 @@ class SAMSSampler(object):
         if self.update_stages == 'one-stage':
             gamma = gamma0 / float(self.iteration+1) # prefactor in Eq. 9 and 12 from [1]
         elif self.update_stages == 'two-stage':
-            gamma = gamma0
             if hasattr(self, 'second_stage_iteration_start'):
                 # We flattened at iteration t0. Use this to compute gamma
                 t0 = self.second_stage_iteration_start
@@ -977,6 +976,9 @@ class SAMSSampler(object):
                     self.second_stage_iteration_start = self.iteration
         else:
             raise Exception("update_stages method '%s' unknown" % self.update_stages)
+
+
+        print('gamma = %f' % gamma)
 
         if self.update_method == 'optimal':
             # Based on Eq. 9 of Ref. [1]
