@@ -965,7 +965,9 @@ class SAMSSampler(object):
                 # Use first stage scheme.
                 beta_factor = 0.6
                 t = self.iteration + 1.0
-                gamma = min(pi_k[current_state], t**(-beta_factor)) # Eq. 15
+                #gamma = min(pi_k[current_state], t**(-beta_factor)) # Eq. 15
+                gamma = t**(-beta_factor) # Modified version of Eq. 15
+
                 # Check if all state histograms are "flat" within 20% so we can enter the second stage
                 RELATIVE_HISTOGRAM_ERROR_THRESHOLD = 0.20
                 N_k = self.sampler.number_of_state_visits[:]
