@@ -627,14 +627,14 @@ if __name__ == '__main__':
     testsystem.mcmc_sampler.nsteps = 500
     testsystem.exen_sampler.locality = 5
     testsystem.sams_sampler.update_method = 'rao-blackwellized'
-    niterations = 50
+    niterations = 500
     #testsystem.sams_sampler.mbar_update_interval = 50
     testsystem.sams_sampler.run(niterations)
 
     # Test analysis
     from sams.analysis import analyze, write_trajectory
     netcdf_filename = 'output.nc'
-    #analyze(netcdf_filename, testsystem, 'analyze.pdf')
+    analyze(netcdf_filename, testsystem, 'analyze.pdf')
     reference_pdb_filename = 'output.pdb'
     dcd_trajectory_filename = 'output.dcd'
     trajectory_filename = 'output.xtc'
