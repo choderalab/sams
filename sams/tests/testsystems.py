@@ -623,7 +623,7 @@ if __name__ == '__main__':
     #testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
 
-    testsystem.exen_sampler.update_scheme = 'global-jump'
+    testsystem.exen_sampler.update_scheme = 'restricted-range'
     testsystem.mcmc_sampler.nsteps = 500
     testsystem.exen_sampler.locality = 5
     testsystem.sams_sampler.update_method = 'rao-blackwellized'

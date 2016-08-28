@@ -719,8 +719,11 @@ class ExpandedEnsembleSampler(object):
             log_Gamma_L_j = - float(neighborhood_size)          # log probability of proposing new state
             L = current_state_index
             self.neighborhood = neighborhood
+            # Compute potential for all states in neighborhood
             for j in self.neighborhood:
                 self.u_k[j] = self.thermodynamic_states[j].reduced_potential(self.sampler.context)
+            # Compute log of probability of selecting each state in neighborhood
+            for j in self.neighborhood:
                 if j != L:
                     self.log_P_k[j] = log_Gamma_L_j + min(0.0, log_Gamma_j_L - log_Gamma_L_j + (self.log_weights[j] - self.u_k[j]) - (self.log_weights[L] - self.u_k[L]))
             P_k = np.zeros([self.nstates], np.float64)
@@ -728,12 +731,17 @@ class ExpandedEnsembleSampler(object):
             # Compute probability to return to current state L
             P_k[L] = 0.0
             P_k[L] = 1.0 - P_k[self.neighborhood].sum()
+            print('P_k = ', P_k) # DEBUG
             self.log_P_k[L] = np.log(P_k[L])
-            P_k = P_k[self.neighborhood]
             # Update context.
-            self.thermodynamic_state_index = np.random.choice(self.neighborhood, p=P_k)
+            self.thermodynamic_state_index = np.random.choice(self.neighborhood, p=P_k[neighborhood])
             self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
         elif self.update_scheme == 'global-jump':
+            #
+            # Global jump scheme.
+            # This method is described after Eq. 3 in [1]
+            #
+            
             # Compute unnormalized log probabilities for all thermodynamic states
             self.neighborhood = range(self.nstates)
             for state_index in self.neighborhood:
@@ -755,7 +763,6 @@ class ExpandedEnsembleSampler(object):
             proposed_state_index = np.random.choice(self.neighborhood, p=P_k)
             # Determine neighborhood of proposed state.
             proposed_neighborhood = range(max(0, proposed_state_index - self.locality), min(self.nstates, proposed_state_index + self.locality + 1))
-            proposed_log_P_k = np.zeros([self.nstates], np.float64)
             for j in proposed_neighborhood:
                 if j not in self.neighborhood:
                     self.u_k[j] = self.thermodynamic_states[j].reduced_potential(self.sampler.context)
@@ -905,6 +912,7 @@ class SAMSSampler(object):
         if self.log_target_probabilities is None:
             self.log_target_probabilities = np.zeros([self.sampler.nstates], np.float64)
         self.log_target_probabilities -= logsumexp(self.log_target_probabilities)
+        self.update_log_weights()
 
         # Initialize.
         self.iteration = 0
@@ -976,8 +984,8 @@ class SAMSSampler(object):
                 self.ncfile.variables['stage'][self.iteration] = 1
                 beta_factor = 0.6
                 t = self.iteration + 1.0
-                #gamma = min(pi_k[current_state], t**(-beta_factor)) # Eq. 15
-                gamma = t**(-beta_factor) # Modified version of Eq. 15
+                gamma = min(pi_k[current_state], t**(-beta_factor)) # Eq. 15
+                #gamma = t**(-beta_factor) # Modified version of Eq. 15
 
                 # Check if all state histograms are "flat" within 20% so we can enter the second stage
                 RELATIVE_HISTOGRAM_ERROR_THRESHOLD = 0.20
