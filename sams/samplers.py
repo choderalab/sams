@@ -735,7 +735,6 @@ class ExpandedEnsembleSampler(object):
             self.log_P_k[L] = np.log(P_k[L])
             # Update context.
             self.thermodynamic_state_index = np.random.choice(self.neighborhood, p=P_k[neighborhood])
-            self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
         elif self.update_scheme == 'global-jump':
             #
             # Global jump scheme.
@@ -751,7 +750,6 @@ class ExpandedEnsembleSampler(object):
             # Update sampler Context to current thermodynamic state.
             P_k = np.exp(self.log_P_k[self.neighborhood])
             self.thermodynamic_state_index = np.random.choice(self.neighborhood, p=P_k)
-            self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
         elif self.update_scheme == 'restricted-range':
             # Propose new state from current neighborhood.
             self.neighborhood = range(max(0, current_state_index - self.locality), min(self.nstates, current_state_index + self.locality + 1))
@@ -770,10 +768,11 @@ class ExpandedEnsembleSampler(object):
             log_P_accept = logsumexp(self.log_weights[self.neighborhood] - self.u_k[self.neighborhood]) - logsumexp(self.log_weights[proposed_neighborhood] - self.u_k[proposed_neighborhood])
             if (log_P_accept >= 0.0) or (np.random.rand() < np.exp(log_P_accept)):
                 self.thermodynamic_state_index = proposed_state_index
-            # Update context.
-            self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
         else:
             raise Exception("Update scheme '%s' not implemented." % self.update_scheme)
+
+        # Update context.
+        self.thermodynamic_states[self.thermodynamic_state_index].update_context(self.sampler.context, integrator=self.sampler.integrator)
 
         # Track statistics.
         if (self.thermodynamic_state_index != current_state_index):
@@ -871,7 +870,7 @@ class SAMSSampler(object):
 
     """
     def __init__(self, sampler, logZ=None, log_target_probabilities=None, update_stages='two-stage', update_method='rao-blackwellized', adapt_target_probabilities=False,
-        guess_logZ=False, mbar_update_interval=None):
+        logZ_initialization_method=False, mbar_update_interval=None):
         """
         Create a SAMS Sampler.
 
@@ -889,8 +888,8 @@ class SAMSSampler(object):
             SAMS update algorithm. One of ['optimal', 'rao-blackwellized']
         adapt_target_probabilities : bool, optional, default=False
             If True, target probabilities will be adapted to achieve minimal thermodynamic length between terminal thermodynamic states.
-        guess_logZ : bool, optional, default=False
-            If True, will attempt to guess initial logZ from energies of initial snapshot in all thermodynamic states.
+        logZ_initialization_method : bool, optional, default=False
+            Method to use to guess logZ at start. [False, 'energies', 'nonequilibrium']
         mbar_update_interval : int, optional, default=False
             If set to a positive integer, MBAR will be used to update the estimates with the specified interval until histograms are flat.
 
@@ -921,8 +920,8 @@ class SAMSSampler(object):
         if adapt_target_probabilities:
             raise Exception('Not implemented yet.')
 
-        if guess_logZ:
-            self.guess_logZ()
+        if logZ_initialization_method is not False:
+            self.guess_logZ(logZ_initialization_method)
 
         self.mbar_update_interval = mbar_update_interval
 
@@ -939,12 +938,33 @@ class SAMSSampler(object):
         self.ncfile.createVariable('log_target_probabilities', 'f4', dimensions=('iterations', 'states'), chunksizes=(1,nstates))
         self.ncfile.createVariable('update_logZ_time', 'f4', dimensions=('iterations',), chunksizes=(1,))
 
-    def guess_logZ(self):
-        # Compute guess of all energies.
-        for state_index in range(self.sampler.nstates):
-            self.logZ[state_index] = - self.sampler.thermodynamic_states[state_index].reduced_potential(self.sampler.sampler.context)
-        # Restore thermodynamic state.
-        self.sampler.thermodynamic_states[self.sampler.thermodynamic_state_index].update_context(self.sampler.sampler.context, self.sampler.integrator)
+    def guess_logZ(self, method):
+        # Initialize sampler
+        self.sampler.update()
+
+        # Guess logZ
+        if method == 'energies':
+            # Compute guess of all energies.
+            for state_index in range(self.sampler.nstates):
+                self.logZ[state_index] = - self.sampler.thermodynamic_states[state_index].reduced_potential(self.sampler.sampler.context)
+            # Restore thermodynamic state.
+            self.sampler.thermodynamic_states[self.sampler.thermodynamic_state_index].update_context(self.sampler.sampler.context, self.sampler.integrator)
+        elif method == 'nonequilibrium':
+            for state_index in range(self.sampler.nstates):
+                print('Driving through state %d / %d' % (state_index, self.sampler.nstates))
+                # Force thermodynamic state
+                self.sampler.thermodynamic_state_index = state_index
+                self.sampler.thermodynamic_states[self.sampler.thermodynamic_state_index].update_context(self.sampler.sampler.context, self.sampler.sampler.integrator)
+                # Sample a bit
+                self.sampler.sampler.update()
+                # Compute an energy
+                self.logZ[state_index] = - self.sampler.thermodynamic_states[state_index].reduced_potential(self.sampler.sampler.context)
+        else:
+            raise Exception("logZ initialization method '%s' unknown" % method)        
+
+        self.logZ[:] -= self.logZ[0]
+        print('initialized logZ:')
+        print(self.logZ)
 
     def update_sampler(self):
         """
@@ -996,7 +1016,7 @@ class SAMSSampler(object):
                 if np.all(relative_error_k < RELATIVE_HISTOGRAM_ERROR_THRESHOLD):
                     self.second_stage_iteration_start = self.iteration
                     # Record start of second stage
-                    setattr(self.ncfile.varables['stage'], 'second_stage_start', self.second_stage_iteration_start)
+                    setattr(self.ncfile, 'second_stage_start', self.second_stage_iteration_start)
         else:
             raise Exception("update_stages method '%s' unknown" % self.update_stages)
 

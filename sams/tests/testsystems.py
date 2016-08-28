@@ -611,25 +611,25 @@ if __name__ == '__main__':
     #generate_ffxml(pdb_filename)
     #stop
 
-    netcdf_filename = 'output.nc'
+    netcdf_filename = 'output2.nc'
 
-    #testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
+    testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
 
     #testsystem = AblImatinibVacuumAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
-    testsystem = HostGuestAlchemical(netcdf_filename=netcdf_filename)
+    #testsystem = HostGuestAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitAlchemical()
     #testsystem = AlanineDipeptideVacuumSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
 
-    testsystem.exen_sampler.update_scheme = 'restricted-range'
+    testsystem.exen_sampler.update_scheme = 'global-jump'
     testsystem.mcmc_sampler.nsteps = 500
     testsystem.exen_sampler.locality = 5
     testsystem.sams_sampler.update_method = 'rao-blackwellized'
-    niterations = 500
+    niterations = 5000
     #testsystem.sams_sampler.mbar_update_interval = 50
-    testsystem.sams_sampler.run(niterations)
+    #testsystem.sams_sampler.run(niterations)
 
     # Test analysis
     from sams.analysis import analyze, write_trajectory

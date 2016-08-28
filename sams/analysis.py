@@ -75,9 +75,12 @@ def analyze(netcdf_filename, testsystem, pdf_filename):
         plt.xlabel('iteration $t$')
         plt.ylabel('state index')
         plt.axis([0, nsamples, 0, nstates-1])
+        if hasattr(ncfile, 'second_stage_start'):
+            t0 = getattr(ncfile, 'second_stage_start')
+            plt.plot([t0, t0], [0, nstates-1], 'r-')
         pdf.savefig()  # saves the current figure into a pdf page
 
-        # PAGE 3
+        # PAGE 3 : logZ estimates
         plt.figure(figsize=(6, 6))
         if hasattr(testsystem, 'logZ'):
             plt.hold(True)
@@ -89,6 +92,48 @@ def analyze(netcdf_filename, testsystem, pdf_filename):
         plt.xlabel('iteration $t$')
         plt.ylabel('$\zeta^{(t)}$')
         plt.axis([0, nsamples, logZ.min(), logZ.max()])
+        if hasattr(ncfile, 'second_stage_start'):
+            t0 = getattr(ncfile, 'second_stage_start')
+            plt.plot([t0, t0], [logZ.min(), logZ.max()], 'r-')
+        pdf.savefig()  # saves the current figure into a pdf page
+
+        # PAGE 4 : gamma
+        plt.figure(figsize=(6, 6))
+        plt.subplot(2,1,1)
+        gamma = ncfile.variables['gamma'][:]
+        plt.plot(gamma[:], '-')
+        plt.hold(True)
+        plt.axis([0, nsamples, gamma.min(), gamma.max()])
+        if hasattr(ncfile, 'second_stage_start'):
+            t0 = getattr(ncfile, 'second_stage_start')
+            plt.plot([t0, t0], [gamma.min(), gamma.max()], 'r-')
+        plt.title(testsystem.description, fontsize=title_fontsize)
+        plt.xlabel('iteration $t$')
+        plt.ylabel('$\gamma_t$')
+        plt.subplot(2,1,2)
+        log_gamma = np.log(ncfile.variables['gamma'][:])
+        plt.plot(log_gamma[:], '-')
+        plt.hold(True)
+        plt.axis([0, nsamples, log_gamma.min(), log_gamma.max()])
+        if hasattr(ncfile, 'second_stage_start'):
+            t0 = getattr(ncfile, 'second_stage_start')
+            plt.plot([t0, t0], [log_gamma.min(), log_gamma.max()], 'r-')
+        plt.xlabel('iteration $t$')
+        plt.ylabel('$\log \gamma_t$')
+        pdf.savefig()  # saves the current figure into a pdf page
+
+        # PAGE 4 : gamma
+        plt.figure(figsize=(6, 6))
+        log_target_probabilities = ncfile.variables['log_target_probabilities'][:,:]
+        plt.plot(log_target_probabilities[:,:], '-')
+        plt.hold(True)
+        plt.axis([0, nsamples, log_target_probabilities.min(), log_target_probabilities.max()])
+        if hasattr(ncfile, 'second_stage_start'):
+            t0 = getattr(ncfile, 'second_stage_start')
+            plt.plot([t0, t0], [log_target_probabilities.min(), log_target_probabilities.max()], 'r-')
+        plt.title(testsystem.description, fontsize=title_fontsize)
+        plt.xlabel('iteration $t$')
+        plt.ylabel('log target probabilities')
         pdf.savefig()  # saves the current figure into a pdf page
 
         # FINISH
