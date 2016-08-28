@@ -94,7 +94,7 @@ def analyze(netcdf_filename, testsystem, pdf_filename):
         # FINISH
         plt.close()
 
-def write_trajectory(netcdf_filename, testsystem, pdb_trajectory_filename, dcd_trajectory_filename):
+def write_trajectory_dcd(netcdf_filename, testsystem, pdb_trajectory_filename, dcd_trajectory_filename):
     """
     Write trajectory.
 
@@ -125,3 +125,39 @@ def write_trajectory(netcdf_filename, testsystem, pdb_trajectory_filename, dcd_t
     with DCDTrajectoryFile(dcd_trajectory_filename, 'w') as f:
         f.write(ncfile.variables['positions'][:,:,:])
     
+
+def write_trajectory(netcdf_filename, topology, reference_pdb_filename, trajectory_filename):
+    """
+    Write trajectory.
+
+    Parameters
+    ----------
+    netcdf_filename : str
+        NetCDF filename.
+    topology : Topology
+        OpenMM topology object
+    reference_pdb_filename
+        PDB trajectory output filename
+    trajectory_filename : str
+        Output trajectory filename. Type is autodetected by extension (.xtc, .dcd, .pdb) recognized by MDTraj
+
+    """
+    ncfile = netCDF4.Dataset(netcdf_filename, 'r')
+    [nsamples, nstates] = ncfile.variables['logZ'].shape
+
+    # Convert to MDTraj trajectory.
+    print('Creating MDTraj trajectory...')
+    mdtraj_topology = mdtraj.Topology.from_openmm(topology)
+    trajectory = mdtraj.Trajectory(ncfile.variables['positions'][:,:,:], mdtraj_topology)
+    trajectory.unitcell_vectors = ncfile.variables['box_vectors'][:,:,:]
+
+    # Center on receptor.
+    trajectory.image_molecules()
+
+    # Write reference.pdb file
+    print('Writing reference PDB file...')
+    trajectory[0].save(reference_pdb_filename)
+
+    print('Writing trajectory...')
+    trajectory.save(trajectory_filename)
+    print('Done.')

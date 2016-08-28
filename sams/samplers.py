@@ -511,8 +511,13 @@ class MCMCSampler(object):
         self.ncfile.createDimension('spatial', 3)
 
         self.ncfile.createVariable('positions', 'f4', dimensions=('iterations', 'atoms', 'spatial'), zlib=True, chunksizes=(1,natoms,3))
+        self.ncfile.createVariable('box_vectors', 'f4', dimensions=('iterations', 'spatial', 'spatial'), zlib=True, chunksizes=(1,3,3))
         self.ncfile.createVariable('potential', 'f8', dimensions=('iterations',), chunksizes=(1,))
         self.ncfile.createVariable('sample_positions_time', 'f4', dimensions=('iterations',), chunksizes=(1,))
+
+        # Weight adaptation information
+        self.ncfile.createVariable('stage', 'i2', dimensions=('iterations',), chunksizes=(1,))
+        self.ncfile.createVariable('gamma', 'f8', dimensions=('iterations',), chunksizes=(1,))
 
     def update(self):
         """
@@ -553,7 +558,9 @@ class MCMCSampler(object):
             print('elapsed time %8.3f s' % elapsed_time)
 
         if self.ncfile:
-            self.ncfile.variables['positions'][self.iteration,:,:] = self.sampler_state.positions[:,:] / unit.angstroms
+            self.ncfile.variables['positions'][self.iteration,:,:] = self.sampler_state.positions[:,:] / unit.nanometers
+            for k in range(3):
+                self.ncfile.variables['box_vectors'][self.iteration,k,:] = self.sampler_state.box_vectors[k,:] / unit.nanometers
             self.ncfile.variables['potential'][self.iteration] = self.thermodynamic_state.beta * self.context.getState(getEnergy=True).getPotentialEnergy()
             self.ncfile.variables['sample_positions_time'][self.iteration] = elapsed_time
 
@@ -956,14 +963,18 @@ class SAMSSampler(object):
         gamma0 = 1.0
         if self.update_stages == 'one-stage':
             gamma = gamma0 / float(self.iteration+1) # prefactor in Eq. 9 and 12 from [1]
+            self.ncfile.variables['stage'][self.iteration] = 1
         elif self.update_stages == 'two-stage':
             if hasattr(self, 'second_stage_iteration_start'):
+                # Use second stage scheme
+                self.ncfile.variables['stage'][self.iteration] = 2
                 # We flattened at iteration t0. Use this to compute gamma
                 t0 = self.second_stage_iteration_start
                 gamma = 1.0 / float(self.iteration - t0 + 1./gamma0)
             else:
                 # Use first stage scheme.
-                beta_factor = 0.4
+                self.ncfile.variables['stage'][self.iteration] = 1
+                beta_factor = 0.6
                 t = self.iteration + 1.0
                 #gamma = min(pi_k[current_state], t**(-beta_factor)) # Eq. 15
                 gamma = t**(-beta_factor) # Modified version of Eq. 15
@@ -976,11 +987,14 @@ class SAMSSampler(object):
                 relative_error_k = np.abs(pi_k - empirical_pi_k) / pi_k
                 if np.all(relative_error_k < RELATIVE_HISTOGRAM_ERROR_THRESHOLD):
                     self.second_stage_iteration_start = self.iteration
+                    # Record start of second stage
+                    setattr(self.ncfile.varables['stage'], 'second_stage_start', self.second_stage_iteration_start)
         else:
             raise Exception("update_stages method '%s' unknown" % self.update_stages)
 
-
+        # Record gamma for this iteration
         print('gamma = %f' % gamma)
+        self.ncfile.variables['gamma'][self.iteration] = gamma
 
         if self.update_method == 'optimal':
             # Based on Eq. 9 of Ref. [1]

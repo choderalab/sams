@@ -329,7 +329,7 @@ class AlchemicalSAMSTestSystem(SAMSTestSystem):
         Pressure
 
     """
-    def __init__(self, alchemical_protocol='two-phase', nlambda=500, **kwargs):
+    def __init__(self, alchemical_protocol='two-phase', nlambda=50, **kwargs):
         """
         Create an alchemical free energy calculation SAMS test system from the provided system.
 
@@ -337,7 +337,7 @@ class AlchemicalSAMSTestSystem(SAMSTestSystem):
         ----------
         alchemical_protocol : str, optional, default='two-phase'
             Alchemical protocol scheme to use. ['two-phase', 'fused']
-        nlambda : int, optional, default=40
+        nlambda : int, optional, default=50
             Number of alchemical states.
 
         """
@@ -611,7 +611,7 @@ if __name__ == '__main__':
     #generate_ffxml(pdb_filename)
     #stop
 
-    netcdf_filename = 'output2.nc'
+    netcdf_filename = 'output.nc'
 
     #testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
 
@@ -627,15 +627,17 @@ if __name__ == '__main__':
     testsystem.mcmc_sampler.nsteps = 500
     testsystem.exen_sampler.locality = 5
     testsystem.sams_sampler.update_method = 'rao-blackwellized'
-    niterations = 5000
+    niterations = 50
     #testsystem.sams_sampler.mbar_update_interval = 50
-    #testsystem.sams_sampler.run(niterations)
+    testsystem.sams_sampler.run(niterations)
 
     # Test analysis
     from sams.analysis import analyze, write_trajectory
     netcdf_filename = 'output.nc'
     #analyze(netcdf_filename, testsystem, 'analyze.pdf')
-    pdb_trajectory_filename = 'output.pdb'
+    reference_pdb_filename = 'output.pdb'
     dcd_trajectory_filename = 'output.dcd'
-    write_trajectory(netcdf_filename, testsystem, pdb_trajectory_filename, dcd_trajectory_filename)
+    trajectory_filename = 'output.xtc'
+    #write_trajectory_dcd(netcdf_filename, testsystem, reference_pdb_filename, dcd_trajectory_filename)
+    write_trajectory(netcdf_filename, testsystem.topology, reference_pdb_filename, trajectory_filename)
 
