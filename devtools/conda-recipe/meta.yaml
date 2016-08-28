@@ -24,6 +24,7 @@ requirements:
     - openmmtools
     - matplotlib
     - seaborn
+    - mdtraj
 
   run:
     - python
@@ -39,6 +40,7 @@ requirements:
     - openmmtools
     - matplotlib
     - seaborn
+    - mdtraj
 
 test:
   requires:

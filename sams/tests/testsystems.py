@@ -611,7 +611,7 @@ if __name__ == '__main__':
     #generate_ffxml(pdb_filename)
     #stop
 
-    netcdf_filename = 'output.nc'
+    netcdf_filename = 'output2.nc'
 
     #testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
 
@@ -627,11 +627,15 @@ if __name__ == '__main__':
     testsystem.mcmc_sampler.nsteps = 500
     testsystem.exen_sampler.locality = 5
     testsystem.sams_sampler.update_method = 'rao-blackwellized'
-    niterations = 1000
+    niterations = 5000
     #testsystem.sams_sampler.mbar_update_interval = 50
-    testsystem.sams_sampler.run(niterations)
+    #testsystem.sams_sampler.run(niterations)
 
     # Test analysis
-    from sams.analysis import analyze
+    from sams.analysis import analyze, write_trajectory
     netcdf_filename = 'output.nc'
-    analyze(netcdf_filename, testsystem, 'analyze.pdf')
+    #analyze(netcdf_filename, testsystem, 'analyze.pdf')
+    pdb_trajectory_filename = 'output.pdb'
+    dcd_trajectory_filename = 'output.dcd'
+    write_trajectory(netcdf_filename, testsystem, pdb_trajectory_filename, dcd_trajectory_filename)
+

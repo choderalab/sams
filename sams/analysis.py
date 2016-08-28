@@ -16,6 +16,9 @@ import sys, math
 import copy
 import time
 
+from simtk import unit 
+import mdtraj
+
 import matplotlib as mpl
 mpl.use('Agg')
 import matplotlib.pyplot as plt
@@ -90,3 +93,35 @@ def analyze(netcdf_filename, testsystem, pdf_filename):
 
         # FINISH
         plt.close()
+
+def write_trajectory(netcdf_filename, testsystem, pdb_trajectory_filename, dcd_trajectory_filename):
+    """
+    Write trajectory.
+
+    Parameters
+    ----------
+    netcdf_filename : str
+        NetCDF filename.
+    testsystem : TestSystem
+        Test system.
+    pdb_trajectory_filename : str
+        PDB trajectory output filename
+    dcd_trajectory_filename : str
+        Output trajectory filename.
+
+    """
+    ncfile = netCDF4.Dataset(netcdf_filename, 'r')
+    [nsamples, nstates] = ncfile.variables['logZ'].shape
+
+    # Write reference.pdb file
+    from simtk.openmm.app import PDBFile
+    outfile = open(pdb_trajectory_filename, 'w')
+    positions = unit.Quantity(ncfile.variables['positions'][0,:,:], unit.angstroms)
+    PDBFile.writeFile(testsystem.topology, positions, file=outfile)
+    outfile.close()
+
+    # TODO: Export as DCD trajectory with MDTraj
+    from mdtraj.formats import DCDTrajectoryFile
+    with DCDTrajectoryFile(dcd_trajectory_filename, 'w') as f:
+        f.write(ncfile.variables['positions'][:,:,:])
+    

@@ -963,7 +963,7 @@ class SAMSSampler(object):
                 gamma = 1.0 / float(self.iteration - t0 + 1./gamma0)
             else:
                 # Use first stage scheme.
-                beta_factor = 0.6
+                beta_factor = 0.4
                 t = self.iteration + 1.0
                 #gamma = min(pi_k[current_state], t**(-beta_factor)) # Eq. 15
                 gamma = t**(-beta_factor) # Modified version of Eq. 15
