@@ -740,7 +740,7 @@ class ExpandedEnsembleSampler(object):
             # Global jump scheme.
             # This method is described after Eq. 3 in [1]
             #
-            
+
             # Compute unnormalized log probabilities for all thermodynamic states
             self.neighborhood = range(self.nstates)
             for state_index in self.neighborhood:
@@ -960,7 +960,7 @@ class SAMSSampler(object):
                 # Compute an energy
                 self.logZ[state_index] = - self.sampler.thermodynamic_states[state_index].reduced_potential(self.sampler.sampler.context)
         else:
-            raise Exception("logZ initialization method '%s' unknown" % method)        
+            raise Exception("logZ initialization method '%s' unknown" % method)
 
         self.logZ[:] -= self.logZ[0]
         print('initialized logZ:')
@@ -991,17 +991,17 @@ class SAMSSampler(object):
         gamma0 = 1.0
         if self.update_stages == 'one-stage':
             gamma = gamma0 / float(self.iteration+1) # prefactor in Eq. 9 and 12 from [1]
-            self.ncfile.variables['stage'][self.iteration] = 1
+            if self.ncfile: self.ncfile.variables['stage'][self.iteration] = 1
         elif self.update_stages == 'two-stage':
             if hasattr(self, 'second_stage_iteration_start'):
                 # Use second stage scheme
-                self.ncfile.variables['stage'][self.iteration] = 2
+                if self.ncfile: self.ncfile.variables['stage'][self.iteration] = 2
                 # We flattened at iteration t0. Use this to compute gamma
                 t0 = self.second_stage_iteration_start
                 gamma = 1.0 / float(self.iteration - t0 + 1./gamma0)
             else:
                 # Use first stage scheme.
-                self.ncfile.variables['stage'][self.iteration] = 1
+                if self.ncfile: self.ncfile.variables['stage'][self.iteration] = 1
                 beta_factor = 0.6
                 t = self.iteration + 1.0
                 gamma = min(pi_k[current_state], t**(-beta_factor)) # Eq. 15
@@ -1022,7 +1022,7 @@ class SAMSSampler(object):
 
         # Record gamma for this iteration
         print('gamma = %f' % gamma)
-        self.ncfile.variables['gamma'][self.iteration] = gamma
+        if self.ncfile: self.ncfile.variables['gamma'][self.iteration] = gamma
 
         if self.update_method == 'optimal':
             # Based on Eq. 9 of Ref. [1]
@@ -1052,6 +1052,9 @@ class SAMSSampler(object):
 
         if not self.sampler.update_scheme == 'global-jump':
             raise Exception("Only global jump is implemented right now.")
+
+        if not self.ncfile:
+            raise Exception("Must have a storage file attached to use MBAR updates")
 
         # Extract relative energies.
         if self.verbose:
