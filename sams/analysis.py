@@ -196,7 +196,13 @@ def write_trajectory(netcdf_filename, topology, reference_pdb_filename, trajecto
     trajectory = mdtraj.Trajectory(ncfile.variables['positions'][:,:,:], mdtraj_topology)
     trajectory.unitcell_vectors = ncfile.variables['box_vectors'][:,:,:]
 
+    # Stripping water
+    print('Stripping water...')
+    solute = trajectory.topology.select('not water')
+    trajectory.atom_slice(solute, inplace=True)
+
     # Center on receptor.
+    print('Imaging molecules...')
     trajectory.image_molecules()
 
     # Write reference.pdb file
