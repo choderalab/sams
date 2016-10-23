@@ -1,0 +1,28 @@
+
+# Load parameters
+loadAmberParams ./setup/molecules/STI/STI.frcmod
+source leaprc.ff14SB
+source leaprc.gaff
+loadAmberParams frcmod.ionsjc_tip3p
+
+# Load molecules
+Abl = loadPdb input/2HYY-pdbfixer.pdb
+STI = loadMol2 ./setup/molecules/STI/STI.gaff.mol2
+
+# Create complex
+complex = combine { Abl STI }
+
+# Solvate systems
+addIons2 complex Cl- 1
+addIons2 complex Na+ 0
+addIons2 complex Cl- 0
+solvateBox complex TIP3PBOX 9.0 iso
+
+# Check charge
+check complex
+
+# Save prmtop and inpcrd files
+saveAmberParm complex ./setup/systems/Abl-STI/complex.prmtop ./setup/systems/Abl-STI/complex.inpcrd
+savePDB complex ./setup/systems/Abl-STI/complex.pdb
+
+quit

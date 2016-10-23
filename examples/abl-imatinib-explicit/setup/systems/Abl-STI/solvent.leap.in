@@ -1,0 +1,23 @@
+
+# Load parameters
+loadAmberParams ./setup/molecules/STI/STI.frcmod
+source leaprc.ff14SB
+source leaprc.gaff
+loadAmberParams frcmod.ionsjc_tip3p
+
+# Load molecules
+STI = loadMol2 ./setup/molecules/STI/STI.gaff.mol2
+
+# Solvate systems
+addIons2 STI Na+ 0
+addIons2 STI Cl- 0
+solvateBox STI TIP3PBOX 9.0 iso
+
+# Check charge
+check STI
+
+# Save prmtop and inpcrd files
+saveAmberParm STI ./setup/systems/Abl-STI/solvent.prmtop ./setup/systems/Abl-STI/solvent.inpcrd
+savePDB STI ./setup/systems/Abl-STI/solvent.pdb
+
+quit

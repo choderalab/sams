@@ -1,5 +1,5 @@
 """
-Test systems for perses automated design.
+Test systems for SAMS.
 
 Examples
 --------
@@ -10,11 +10,6 @@ Alanine dipeptide in various environments (vacuum, implicit, explicit):
 >>> testsystem = AlanineDipeptideTestSystem()
 >>> system_generator = testsystem.system_generator['explicit']
 >>> sams_sampler = testsystem.sams_sampler['explicit']
-
-TODO
-----
-* Have all PersesTestSystem subclasses automatically subjected to a battery of tests.
-* Add short descriptions to each class through a class property.
 
 """
 
@@ -638,4 +633,3 @@ if __name__ == '__main__':
     trajectory_filename = 'output.xtc'
     #write_trajectory_dcd(netcdf_filename, testsystem, reference_pdb_filename, dcd_trajectory_filename)
     write_trajectory(netcdf_filename, testsystem.topology, reference_pdb_filename, trajectory_filename)
-
