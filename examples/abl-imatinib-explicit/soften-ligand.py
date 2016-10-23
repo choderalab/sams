@@ -22,7 +22,7 @@ from openeye import oechem
 import netCDF4
 
 ################################################################################
-# MAIN
+# MAJOR SETTINGS AND PARAMETERS
 ################################################################################
 
 # Define paths for explicitly-solvated complex
@@ -41,6 +41,11 @@ netcdf_filename = 'output.nc'
 temperature = 298.0 * unit.kelvin
 pressure = 1.0 * unit.atmospheres
 timestep = 2.0 * unit.femtoseconds
+minimize = True # if True, will minimize the structure before simulation (highly recommended)
+
+################################################################################
+# MAIN
+################################################################################
 
 # Load Amber prmtop/inpcrd for complex and create fully-interacting reference system
 print('Loading Amber prmtop/inpcrd files...')
@@ -50,6 +55,11 @@ reference_system = prmtop.createSystem(nonbondedMethod=app.PME, constraints=app.
 topology = prmtop.topology
 positions = inpcrd.positions
 print('System has %d atoms.' % reference_system.getNumParticles())
+
+# Add a barostat
+print("Adding barostat...")
+barostat = openmm.MonteCarloBarostat(pressure, temperature)
+reference_system.addForce(barostat)
 
 # Identify ligand indices by residue name
 print('Identifying ligand atoms to be alchemically modified...')
@@ -91,21 +101,22 @@ sams_sampler = SAMSSampler(exen_sampler)
 sams_sampler.verbose = True
 
 # Minimize
-print('Minimizing...')
-timestep = 1.0 * unit.femtoseconds
-integrator = openmm.VerletIntegrator(timestep)
-context = openmm.Context(system, integrator)
-context.setPositions(positions)
-print("Initial energy is %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
-TOL = 1.0
-MAX_STEPS = 500
-openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
-print("Final energy is   %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
-# Update positions.
-positions = context.getState(getPositions=True).getPositions(asNumpy=True)
-mcmc_sampler.sampler_state.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
-# Clean up.
-del context, integrator
+if minimize:
+    print('Minimizing...')
+    timestep = 1.0 * unit.femtoseconds
+    integrator = openmm.VerletIntegrator(timestep)
+    context = openmm.Context(system, integrator)
+    context.setPositions(positions)
+    print("Initial energy is %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    TOL = 1.0
+    MAX_STEPS = 500
+    openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
+    print("Final energy is   %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    # Update positions.
+    positions = context.getState(getPositions=True).getPositions(asNumpy=True)
+    mcmc_sampler.sampler_state.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
+    # Clean up.
+    del context, integrator
 
 # DEBUG: Write PDB of initial frame
 print("Writing initial frame to 'initial.pdb'...")
@@ -116,10 +127,10 @@ outfile.close()
 
 # Run the simulation
 print('Running simulation...')
-testsystem.exen_sampler.update_scheme = 'restricted-range' # scheme for deciding which alchemical state to jump to
-testsystem.exen_sampler.locality = 5 # number of neighboring states to use in deciding which alchemical state to jump to
-testsystem.sams_sampler.update_method = 'rao-blackwellized' # scheme for updating free energy estimates
+exen_sampler.update_scheme = 'restricted-range' # scheme for deciding which alchemical state to jump to
+exen_sampler.locality = 5 # number of neighboring states to use in deciding which alchemical state to jump to
+sams_sampler.update_method = 'rao-blackwellized' # scheme for updating free energy estimates
 niterations = 100 # number of iterations to run
-testsystem.sams_sampler.run(niterations) # run sampler
+sams_sampler.run(niterations) # run sampler
 
 # TODO: Get MDTraj trajectory afterwards
