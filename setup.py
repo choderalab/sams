@@ -46,7 +46,7 @@ def find_package_data(data_root, package_root):
 
 
 # #########################
-VERSION = '0.1'
+VERSION = '0.1.0'
 ISRELEASED = False
 __version__ = VERSION
 # #########################
@@ -54,7 +54,7 @@ __version__ = VERSION
 CLASSIFIERS = """\
 Intended Audience :: Science/Research
 Intended Audience :: Developers
-License :: OSI Approved :: GNU Lesser General Public License v2 or later (LGPLv2+)
+License :: OSI Approved :: MIT License
 Programming Language :: C++
 Programming Language :: Python
 Development Status :: 4 - Beta
@@ -90,13 +90,14 @@ setup(name='sams',
         'numpy',
         'scipy',
         'pymbar',
-        'openmm',
+        'openmm >=7.1.0',
         'netcdf4',
         'parmed',
         'openmoltools',
-        'alchemy >=1.1.3',
+        'alchemy >=1.2.1',
         'openmmtools',
         'matplotlib',
-        'seaborn'
+        'seaborn',
+        'mdtraj'
         ],
       )

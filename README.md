@@ -41,3 +41,9 @@ cd examples/abl-imatinib-explicit/
 python soften-ligand.py
 ```
 A GPU is heavily recommended!
+
+## Manifest
+* `examples/` - various example applications of SAMS
+* `notebooks/` - exploratory notebooks for SAMS applied to simple analytical systems
+* `references/` - some SAMS reference articles
+* `manuscripts/` - manuscripts in progress
