@@ -17,7 +17,14 @@ Make sure you have the omnia channel and `dev` label added to your conda path:
 # Add omnia dev channels to pick up `openmm 7.1.0` pre-release
 - conda config --add channels omnia/label/dev
 ```
-Install SAMS:
+Make sure you have the OpenMM 7.1.0 preview installed:
+```bash
+# Clean out cached version of openmm package
+conda clean -pltis --yes
+# Install OpenMM 7.1.0 dev preview
+conda install --yes openmm==7.1.0
+```
+Install `sams`:
 ```bash
 conda install --yes sams
 ```
