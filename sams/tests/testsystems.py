@@ -1,5 +1,5 @@
 """
-Test systems for perses automated design.
+Test systems for SAMS.
 
 Examples
 --------
@@ -10,11 +10,6 @@ Alanine dipeptide in various environments (vacuum, implicit, explicit):
 >>> testsystem = AlanineDipeptideTestSystem()
 >>> system_generator = testsystem.system_generator['explicit']
 >>> sams_sampler = testsystem.sams_sampler['explicit']
-
-TODO
-----
-* Have all PersesTestSystem subclasses automatically subjected to a battery of tests.
-* Add short descriptions to each class through a class property.
 
 """
 
@@ -329,7 +324,7 @@ class AlchemicalSAMSTestSystem(SAMSTestSystem):
         Pressure
 
     """
-    def __init__(self, alchemical_protocol='two-phase', nlambda=40, **kwargs):
+    def __init__(self, alchemical_protocol='two-phase', nlambda=50, **kwargs):
         """
         Create an alchemical free energy calculation SAMS test system from the provided system.
 
@@ -337,7 +332,7 @@ class AlchemicalSAMSTestSystem(SAMSTestSystem):
         ----------
         alchemical_protocol : str, optional, default='two-phase'
             Alchemical protocol scheme to use. ['two-phase', 'fused']
-        nlambda : int, optional, default=40
+        nlambda : int, optional, default=50
             Number of alchemical states.
 
         """
@@ -542,7 +537,7 @@ class AblImatinibExplicitAlchemical(AlchemicalSAMSTestSystem):
         imatinib_xml_filename = resource_filename('sams', 'data/abl-imatinib/imatinib.xml')
         system_generators = dict()
         ffxmls = [gaff_xml_filename, imatinib_xml_filename, 'amber99sbildn.xml', 'tip3p.xml']
-        forcefield_kwargs={ 'nonbondedMethod' : app.CutoffPeriodic, 'nonbondedCutoff' : 9.0 * unit.angstrom, 'implicitSolvent' : None, 'constraints' : app.HBonds, 'rigidWater' : True }
+        forcefield_kwargs={ 'nonbondedMethod' : app.PME, 'nonbondedCutoff' : 9.0 * unit.angstrom, 'implicitSolvent' : None, 'constraints' : app.HBonds, 'rigidWater' : True }
 
         # Load topologies and positions for all components
         print('Creating Abl:imatinib test system...')
@@ -611,26 +606,29 @@ if __name__ == '__main__':
     #generate_ffxml(pdb_filename)
     #stop
 
-    netcdf_filename = 'output.nc'
+    netcdf_filename = 'output2.nc'
 
     #testsystem = HarmonicOscillatorSimulatedTempering(netcdf_filename=netcdf_filename)
-
-    testsystem = AblImatinibVacuumAlchemical(netcdf_filename=netcdf_filename)
-    #testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
+    #testsystem = AblImatinibVacuumAlchemical(netcdf_filename=netcdf_filename)
+    testsystem = AblImatinibExplicitAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = HostGuestAlchemical(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitAlchemical()
     #testsystem = AlanineDipeptideVacuumSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = AlanineDipeptideExplicitSimulatedTempering(netcdf_filename=netcdf_filename)
     #testsystem = WaterBoxAlchemical(netcdf_filename=netcdf_filename)
 
-    testsystem.exen_sampler.update_scheme = 'global-jump'
-    testsystem.mcmc_sampler.nsteps = 500
+    testsystem.exen_sampler.update_scheme = 'restricted-range'
+    testsystem.mcmc_sampler.nsteps = 2500
     testsystem.exen_sampler.locality = 5
     testsystem.sams_sampler.update_method = 'rao-blackwellized'
-    niterations = 1000
-    #testsystem.sams_sampler.mbar_update_interval = 50
-    testsystem.sams_sampler.run(niterations)
+    niterations = 5000
+    #testsystem.sams_sampler.run(niterations)
 
     # Test analysis
-    from sams.analysis import analyze
+    from sams.analysis import analyze, write_trajectory
+    netcdf_filename = 'output.nc'
     analyze(netcdf_filename, testsystem, 'analyze.pdf')
+    reference_pdb_filename = 'output.pdb'
+    dcd_trajectory_filename = 'output.dcd'
+    trajectory_filename = 'output.xtc'
+    write_trajectory(netcdf_filename, testsystem.topology, reference_pdb_filename, trajectory_filename)
