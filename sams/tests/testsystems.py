@@ -631,5 +631,4 @@ if __name__ == '__main__':
     reference_pdb_filename = 'output.pdb'
     dcd_trajectory_filename = 'output.dcd'
     trajectory_filename = 'output.xtc'
-    #write_trajectory_dcd(netcdf_filename, testsystem, reference_pdb_filename, dcd_trajectory_filename)
     write_trajectory(netcdf_filename, testsystem.topology, reference_pdb_filename, trajectory_filename)

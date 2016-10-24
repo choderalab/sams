@@ -37,6 +37,8 @@ min_alchemical_lambda = 0.7 # minimum softness to use; 0 is noninteracting; too 
 alchemical_lambdas = np.linspace(1.0, min_alchemical_lambda, nlambda)
 # Output SAMS filename
 netcdf_filename = 'output.nc'
+pdb_trajectory_filename = 'trajectory.pdb' # first frame of trajectory to be written at end
+dcd_trajectory_filename = 'trajectory.dcd' # DCD format for trajectory to be written at end
 # Simulation conditions
 temperature = 298.0 * unit.kelvin
 pressure = 1.0 * unit.atmospheres
@@ -132,5 +134,8 @@ exen_sampler.locality = 5 # number of neighboring states to use in deciding whic
 sams_sampler.update_method = 'rao-blackwellized' # scheme for updating free energy estimates
 niterations = 100 # number of iterations to run
 sams_sampler.run(niterations) # run sampler
+ncfile.close()
 
-# TODO: Get MDTraj trajectory afterwards
+# Write trajectory
+from sams import analysis
+analysis.write_trajectory_dcd(netcdf_filename, topology, pdb_trajectory_filename, dcd_trajectory_filename)
