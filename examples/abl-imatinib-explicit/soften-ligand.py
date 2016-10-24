@@ -44,8 +44,6 @@ temperature = 298.0 * unit.kelvin
 pressure = 1.0 * unit.atmospheres
 timestep = 2.0 * unit.femtoseconds
 minimize = True # if True, will minimize the structure before simulation (highly recommended)
-# Simulation platform
-platform_name = 'CUDA' # safest for now
 
 ################################################################################
 # MAIN
@@ -83,33 +81,16 @@ for alchemical_lambda in alchemical_lambdas:
     parameters = {'lambda_sterics' : alchemical_lambda, 'lambda_electrostatics' : alchemical_lambda}
     thermodynamic_states.append( ThermodynamicState(system=system, temperature=temperature, pressure=pressure, parameters=parameters) )
 
-# Create output SAMS file
-print('Opening %s for writing...' % netcdf_filename)
-ncfile = netCDF4.Dataset(netcdf_filename, mode='w')
-
-# Create SAMS samplers
-print('Setting up samplers...')
-from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
-thermodynamic_state_index = 0 # initial thermodynamic state index
-thermodynamic_state = thermodynamic_states[thermodynamic_state_index]
-sampler_state = SamplerState(positions=positions)
-platform = openmm.Platform.getPlatformByName(platform_name)
+# Select platform automatically; use mixed precision
+integrator = openmm.VerletIntegrator(timestep)
+context = openmm.Context(system, integrator)
+platform = context.getPlatform()
+del context
 platform.setPropertyDefaultValue('Precision', 'mixed')
-mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=ncfile, platform=platform)
-mcmc_sampler.timestep = timestep
-mcmc_sampler.nsteps = 500
-#mcmc_sampler.pdbfile = open('output.pdb', 'w') # uncomment this if you want to write a PDB trajectory as you simulate; WARNING: LARGE!
-mcmc_sampler.topology = topology
-mcmc_sampler.verbose = True
-exen_sampler = ExpandedEnsembleSampler(mcmc_sampler, thermodynamic_states)
-exen_sampler.verbose = True
-sams_sampler = SAMSSampler(exen_sampler)
-sams_sampler.verbose = True
 
 # Minimize
 if minimize:
     print('Minimizing...')
-    timestep = 1.0 * unit.femtoseconds
     integrator = openmm.VerletIntegrator(timestep)
     context = openmm.Context(system, integrator)
     context.setPositions(positions)
@@ -123,6 +104,27 @@ if minimize:
     mcmc_sampler.sampler_state.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
     # Clean up.
     del context, integrator
+
+# Create output SAMS file
+print('Opening %s for writing...' % netcdf_filename)
+ncfile = netCDF4.Dataset(netcdf_filename, mode='w')
+
+# Create SAMS samplers
+print('Setting up samplers...')
+from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
+thermodynamic_state_index = 0 # initial thermodynamic state index
+thermodynamic_state = thermodynamic_states[thermodynamic_state_index]
+sampler_state = SamplerState(positions=positions)
+mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=ncfile, platform=platform)
+mcmc_sampler.timestep = timestep
+mcmc_sampler.nsteps = 500
+#mcmc_sampler.pdbfile = open('output.pdb', 'w') # uncomment this if you want to write a PDB trajectory as you simulate; WARNING: LARGE!
+mcmc_sampler.topology = topology
+mcmc_sampler.verbose = True
+exen_sampler = ExpandedEnsembleSampler(mcmc_sampler, thermodynamic_states)
+exen_sampler.verbose = True
+sams_sampler = SAMSSampler(exen_sampler)
+sams_sampler.verbose = True
 
 # DEBUG: Write PDB of initial frame
 print("Writing initial frame to 'initial.pdb'...")
