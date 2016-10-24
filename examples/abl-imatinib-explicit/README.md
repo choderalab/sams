@@ -1,6 +1,7 @@
 # Alchemical softening of imatinib bound to Abl
 
-This example uses fused alchemical softcore potentials to relax the geometry of imatinib in the binding site of Abl kinase.
+This example uses fused alchemical softcore potentials implemented in the [`alchemy`](https://github.com/choderalab/alchemy) package to relax the geometry of imatinib in the binding site of Abl kinase.
+The ligand is not fully alchemically annihilated---only partially, so as to allow sampling barriers to be easily overcome.
 
 ## Manifest
 

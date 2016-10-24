@@ -2,7 +2,14 @@
 
 # Self-adjusted mixture sampling (SAMS)
 
-Self-adjusted mixture sampling experiments, based on ideas from [Zhiqiang Tan (Rutgers)](http://stat.rutgers.edu/~ztan/)
+Self-adjusted mixture sampling experiments, based on ideas from [Zhiqiang Tan (Rutgers)](http://stat.rutgers.edu/~ztan/).
+
+Self-adjusted mixture sampling (SAMS), like the closely related Wang-Landau methods, automatically adjust the weights of different thermodynamic states in an expanded ensemble simulation to achieve a desired target distribution over the states (often a uniform distribution).
+Unlike Wang-Landau, however, SAMS is both asymptotically consistent (in that it converges to the true unbiased free energies) and is *asymptotically optimal* (converging to the true unbiased free energies in minimum time).
+See Reference [1] for more information and proofs.
+
+This package explores the use of SAMS methods in various molecular simulation contexts using the [OpenMM](http://openmm.org) GPU-accelerated molecular simulation package.
+See the [`examples/`](https://github.com/choderalab/sams/tree/master/examples) for more information about specific applications.
 
 ## Notice
 
@@ -28,8 +35,9 @@ Install `sams`:
 ```bash
 conda install --yes sams
 ```
-Try the example in `examples/abl-imatinib-explicit/`:
+Try the example in `examples/abl-imatinib-explicit/`, which illustrates how to alchemically soften a small molecule (imatinib) in the binding site of a protein (Abl kinase) in explicit solvent:
 ```bash
 cd examples/abl-imatinib-explicit/
 python soften-ligand.py
 ```
+A GPU is heavily recommended!
