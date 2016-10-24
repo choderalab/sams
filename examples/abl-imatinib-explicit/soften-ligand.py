@@ -42,7 +42,7 @@ dcd_trajectory_filename = 'trajectory.dcd' # DCD format for trajectory to be wri
 # Simulation conditions
 temperature = 298.0 * unit.kelvin
 pressure = 1.0 * unit.atmospheres
-timestep = 2.0 * unit.femtoseconds
+timestep = 1.5 * unit.femtoseconds
 minimize = True # if True, will minimize the structure before simulation (highly recommended)
 # Simulation platform
 platform_name = 'OpenCL' # safest for now
