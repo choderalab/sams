@@ -16,7 +16,7 @@ requirements:
     - numpy
     - scipy
     - pymbar
-    - openmm >=7.1.0
+    - openmm
     - netcdf4
     - parmed
     - openmoltools
@@ -32,7 +32,7 @@ requirements:
     - numpy
     - scipy
     - pymbar
-    - openmm >=7.1.0
+    - openmm
     - netcdf4
     - parmed
     - openmoltools
