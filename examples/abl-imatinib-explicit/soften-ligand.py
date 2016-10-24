@@ -44,6 +44,8 @@ temperature = 298.0 * unit.kelvin
 pressure = 1.0 * unit.atmospheres
 timestep = 2.0 * unit.femtoseconds
 minimize = True # if True, will minimize the structure before simulation (highly recommended)
+# Simulation platform
+platform_name = 'OpenCL' # safest for now
 
 ################################################################################
 # MAIN
@@ -91,7 +93,9 @@ from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SA
 thermodynamic_state_index = 0 # initial thermodynamic state index
 thermodynamic_state = thermodynamic_states[thermodynamic_state_index]
 sampler_state = SamplerState(positions=positions)
-mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=ncfile)
+platform = openmm.Platform.getPlatformByName(platform_name)
+platform.setPropertyDefaultValue('Precision', 'mixed')
+mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=ncfile, platform=platform)
 mcmc_sampler.timestep = timestep
 mcmc_sampler.nsteps = 500
 #mcmc_sampler.pdbfile = open('output.pdb', 'w') # uncomment this if you want to write a PDB trajectory as you simulate; WARNING: LARGE!
@@ -130,7 +134,7 @@ outfile.close()
 # Run the simulation
 print('Running simulation...')
 exen_sampler.update_scheme = 'restricted-range' # scheme for deciding which alchemical state to jump to
-exen_sampler.locality = 5 # number of neighboring states to use in deciding which alchemical state to jump to
+exen_sampler.locality = 3 # number of neighboring states to use in deciding which alchemical state to jump to
 sams_sampler.update_method = 'rao-blackwellized' # scheme for updating free energy estimates
 niterations = 100 # number of iterations to run
 sams_sampler.run(niterations) # run sampler
