@@ -37,7 +37,11 @@ conda install --yes sams
 ```
 Try the example in `examples/abl-imatinib-explicit/`, which illustrates how to alchemically soften a small molecule (imatinib) in the binding site of a protein (Abl kinase) in explicit solvent:
 ```bash
+# Check out the repository (if you haven't done so already)
+git clone https://github.com/choderalab/sams.git
+# Go to the example directory
 cd examples/abl-imatinib-explicit/
+# Run the example!
 python soften-ligand.py
 ```
 A GPU is heavily recommended!
