@@ -18,7 +18,6 @@ import alchemy
 from simtk import openmm, unit
 from simtk.openmm import app
 import mdtraj as md
-from openeye import oechem
 import netCDF4
 
 ################################################################################
@@ -67,6 +66,7 @@ reference_system.addForce(barostat)
 print('Identifying ligand atoms to be alchemically modified...')
 reference = md.load(pdb_filename)
 alchemical_atoms = reference.topology.select(ligand_dsl_selection) # these atoms will be alchemically softened
+alchemical_atoms = [ int(index) for index in alchemical_atoms ] # recode as Python int
 print("MDTraj DSL selection '%s' identified %d atoms" % (ligand_dsl_selection, len(alchemical_atoms)))
 
 # Create alchemically-modified system using fused softcore electrostatics and sterics
@@ -101,7 +101,6 @@ if minimize:
     print("Final energy is   %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     # Update positions.
     positions = context.getState(getPositions=True).getPositions(asNumpy=True)
-    mcmc_sampler.sampler_state.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
     # Clean up.
     del context, integrator
 
