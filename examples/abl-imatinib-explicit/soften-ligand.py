@@ -140,8 +140,7 @@ exen_sampler.update_scheme = 'restricted-range' # scheme for deciding which alch
 exen_sampler.locality = 3 # number of neighboring states to use in deciding which alchemical state to jump to
 sams_sampler.update_method = 'rao-blackwellized' # scheme for updating free energy estimates
 niterations = 100 # number of iterations to run
-mcmc_sampler.run(niterations) # run sampler
-#sams_sampler.run(niterations) # run sampler
+sams_sampler.run(niterations) # run sampler
 ncfile.close()
 
 # Write trajectory
