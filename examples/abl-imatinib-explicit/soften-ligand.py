@@ -41,6 +41,7 @@ dcd_trajectory_filename = 'trajectory.dcd' # DCD format for trajectory to be wri
 # Simulation conditions
 temperature = 298.0 * unit.kelvin
 pressure = 1.0 * unit.atmospheres
+pressure = None # WARNING: This is a temporary workaround for some issues with the GTX-1080.
 timestep = 2.0 * unit.femtoseconds
 minimize = True # if True, will minimize the structure before simulation (highly recommended)
 
@@ -57,10 +58,11 @@ topology = prmtop.topology
 positions = inpcrd.positions
 print('System has %d atoms.' % reference_system.getNumParticles())
 
-# Add a barostat
-print("Adding barostat...")
-barostat = openmm.MonteCarloBarostat(pressure, temperature)
-reference_system.addForce(barostat)
+if pressure is not None:
+    # Add a barostat
+    print("Adding barostat...")
+    barostat = openmm.MonteCarloBarostat(pressure, temperature)
+    reference_system.addForce(barostat)
 
 # Identify ligand indices by residue name
 print('Identifying ligand atoms to be alchemically modified...')
@@ -138,7 +140,8 @@ exen_sampler.update_scheme = 'restricted-range' # scheme for deciding which alch
 exen_sampler.locality = 3 # number of neighboring states to use in deciding which alchemical state to jump to
 sams_sampler.update_method = 'rao-blackwellized' # scheme for updating free energy estimates
 niterations = 100 # number of iterations to run
-sams_sampler.run(niterations) # run sampler
+mcmc_sampler.run(niterations) # run sampler
+#sams_sampler.run(niterations) # run sampler
 ncfile.close()
 
 # Write trajectory
