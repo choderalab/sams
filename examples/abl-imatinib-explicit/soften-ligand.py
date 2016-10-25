@@ -89,6 +89,9 @@ context = openmm.Context(system, integrator)
 platform = context.getPlatform()
 del context
 platform.setPropertyDefaultValue('Precision', 'mixed')
+if platform.getName() == 'OpenCL':
+    # GTX-1080 workaround
+    platform.setPropertyDefaultValue('OpenCLDisablePmeStream', 'true')
 
 # Minimize
 if minimize:
