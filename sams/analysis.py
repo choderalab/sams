@@ -161,14 +161,14 @@ def write_trajectory_dcd(netcdf_filename, topology, pdb_trajectory_filename, dcd
     # Write reference.pdb file
     from simtk.openmm.app import PDBFile
     outfile = open(pdb_trajectory_filename, 'w')
-    positions = unit.Quantity(ncfile.variables['positions'][0,:,:], unit.angstroms)
+    positions = unit.Quantity(ncfile.variables['positions'][0,:,:], unit.nanometers)
     PDBFile.writeFile(topology, positions, file=outfile)
     outfile.close()
 
     # TODO: Export as DCD trajectory with MDTraj
     from mdtraj.formats import DCDTrajectoryFile
     with DCDTrajectoryFile(dcd_trajectory_filename, 'w') as f:
-        f.write(ncfile.variables['positions'][:,:,:])
+        f.write(ncfile.variables['positions'][:,:,:] * 10.0) # angstroms
 
 def write_trajectory(netcdf_filename, topology, reference_pdb_filename, trajectory_filename):
     """

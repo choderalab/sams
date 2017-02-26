@@ -167,7 +167,7 @@ thermodynamic_state = thermodynamic_states[thermodynamic_state_index]
 sampler_state = SamplerState(positions=positions)
 mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=ncfile, platform=platform)
 mcmc_sampler.timestep = timestep
-mcmc_sampler.nsteps = 500
+mcmc_sampler.nsteps = 2500
 #mcmc_sampler.pdbfile = open('output.pdb', 'w') # uncomment this if you want to write a PDB trajectory as you simulate; WARNING: LARGE!
 mcmc_sampler.topology = topology
 mcmc_sampler.verbose = True
@@ -193,6 +193,12 @@ niterations = 100 # number of iterations to run
 sams_sampler.run(niterations) # run sampler
 ncfile.close()
 
-# Write trajectory
+# Analyze
 from sams import analysis
+# States 
+from collections import namedtuple
+MockTestsystem = namedtuple('MockTestsystem', ['description', 'thermodynamic_states'])
+testsystem = MockTestsystem(description='Abl:imatinib with alchemical and umbrella states', thermodynamic_states=thermodynamic_states)
+analysis.analyze(netcdf_filename, testsystem, 'output.pdf')
+# Write trajectory
 analysis.write_trajectory_dcd(netcdf_filename, topology, pdb_trajectory_filename, dcd_trajectory_filename)
