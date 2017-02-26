@@ -30,11 +30,6 @@
 #
 # mail settings
 #PBS -m n
-#
-# filename for standard output (default = <job_name>.o<job_id>)
-# at end of job, it is in directory from which qsub was executed
-# remove extra ## from the line below if you want to name your own file
-#PBS -o /cbio/jclab/home/chodera/vvvr/openmm/timescale-correction/vvvr.out
 
 cd $PBS_O_WORKDIR
 
@@ -47,6 +42,6 @@ cat $PBS_GPUFILE
 setenv OPENMM_CPU_THREADS 1
 
 date
-python hybrid-alchemical-umbrella.py
+python hybrid-alchemical-umbrella2.py
 date
 

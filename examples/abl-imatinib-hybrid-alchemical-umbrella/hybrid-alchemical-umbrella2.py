@@ -191,7 +191,7 @@ print('Running simulation...')
 exen_sampler.update_scheme = 'global-jump' # scheme for deciding which alchemical state to jump to
 exen_sampler.locality = thermodynamic_state_neighbors # neighbors to examine for each state
 sams_sampler.update_method = 'rao-blackwellized' # scheme for updating free energy estimates
-niterations = 100 # number of iterations to run
+niterations = 2000 # number of iterations to run
 sams_sampler.run(niterations) # run sampler
 ncfile.close()
 
@@ -203,4 +203,6 @@ MockTestsystem = namedtuple('MockTestsystem', ['description', 'thermodynamic_sta
 testsystem = MockTestsystem(description='Abl:imatinib with alchemical and umbrella states', thermodynamic_states=thermodynamic_states)
 analysis.analyze(netcdf_filename, testsystem, 'output.pdf')
 # Write trajectory
-analysis.write_trajectory_dcd(netcdf_filename, topology, pdb_trajectory_filename, dcd_trajectory_filename)
+reference_pdb_filename = 'trajectory.pdb'
+trajectory_filename = 'trajectory.dcd'
+analysis.write_trajectory(netcdf_filename, topology, reference_pdb_filename, trajectory_filename)
