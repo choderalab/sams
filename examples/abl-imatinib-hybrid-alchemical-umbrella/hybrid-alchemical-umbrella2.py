@@ -31,11 +31,11 @@ pdb_filename = 'setup/systems/Abl-STI/complex.pdb'
 # Specify MDTraj DSL selection for ligand
 ligand_dsl_selection = 'resn MOL'
 # Specify alchemical lambdas to use for softening
-nlambda = 20 # number of alchemical states
+nlambda = 50 # number of alchemical states
 alchemical_lambdas = np.linspace(1.0, 0.0, nlambda)
 # Specify umbrellas for distance restraint
-numbrellas = 20
-umbrella_sigma = 1.0 * unit.angstroms # umbrella stddev width in absene of external PMF (no Jacobian)
+numbrellas = 50
+umbrella_sigma = 0.5 * unit.angstroms # umbrella stddev width in absene of external PMF (no Jacobian)
 umbrella_atoms = [783-1, 2409-1] # ATOM    783  CA  PHE    49      -1.230 -11.285  10.321  1.00  0.00 # ???
                                  # ATOM   2409  CZ  PHE   148       4.799  -2.974  -1.441  1.00  0.00 # DFG
 umbrella_distances = np.linspace(2.0, 15.0, numbrellas) * unit.angstroms
@@ -107,13 +107,15 @@ for alchemical_lambda in alchemical_lambdas:
         'umbrella_K' : 0.0, 'umbrella_r0' : 0.0, # umbrella parameters
         }
     thermodynamic_states.append( ThermodynamicState(system=system, temperature=temperature, pressure=pressure, parameters=parameters) )
-    # Umbrella on state
-    for umbrella_distance in umbrella_distances:
-        parameters = {
-            'lambda_sterics' : alchemical_lambda, 'lambda_electrostatics' : alchemical_lambda, # alchemical parameters
-            'umbrella_K' : umbrella_K.value_in_unit_system(unit.md_unit_system), 'umbrella_r0' : umbrella_distance.value_in_unit_system(unit.md_unit_system), # umbrella parameters
-            }
-        thermodynamic_states.append( ThermodynamicState(system=system, temperature=temperature, pressure=pressure, parameters=parameters) )
+    
+# Umbrella on state
+alchemical_lambda = 0.0
+for umbrella_distance in umbrella_distances:
+    parameters = {
+        'lambda_sterics' : alchemical_lambda, 'lambda_electrostatics' : alchemical_lambda, # alchemical parameters
+        'umbrella_K' : umbrella_K.value_in_unit_system(unit.md_unit_system), 'umbrella_r0' : umbrella_distance.value_in_unit_system(unit.md_unit_system), # umbrella parameters
+    }
+    thermodynamic_states.append( ThermodynamicState(system=system, temperature=temperature, pressure=pressure, parameters=parameters) )
 
 # Compile list of thermodynamic state neighbors
 print('Determining thermodynamic state neighbors...')
