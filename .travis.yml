@@ -1,30 +1,9 @@
 language: c
 sudo: false
-
-# addons needed for matplotlib
 addons:
   apt:
-    packages:
-      - inkscape
-      - libav-tools
-      - gdb
-      - mencoder
-      - dvipng
-      - pgf
-      - lmodern
-      - cm-super
-      - texlive-latex-base
-      - texlive-latex-extra
-      - texlive-fonts-recommended
-      - texlive-latex-recommended
-      - texlive-xetex
-      - graphviz
-      - libgeos-dev
-      - otf-freefont
-
-branches:
-  only:
-    - master
+    sources:
+    - ubuntu-toolchain-r-test
 
 install:
   - source devtools/travis-ci/install.sh
@@ -49,31 +28,33 @@ script:
   - conda build devtools/conda-recipe
   # Install the package
   - conda install --yes --use-local ${PACKAGENAME}-dev
-  # Install testing dependencies
+  # Install testing dependencies. Without specifying the numpy version, numpy
+  # is downgraded to 1.9 and we get a "libgfortran not found" issue.
   - conda install --yes --quiet nose nose-timer
   # Test the package
-  - cd devtools && nosetests $PACKAGENAME --nocapture --verbosity=2 --with-timer -a '!slow' && cd ..
-  
+  # TODO: remove the IGNORE_EXCEPTION_DETAIL when we drop Python2 support
+  - cd devtools && nosetests $PACKAGENAME --nocapture --verbosity=2 --with-timer --with-doctest --doctest-options="+IGNORE_EXCEPTION_DETAIL" -a '!slow' && cd ..
+
 env:
   matrix:
     - python=2.7  CONDA_PY=27
     - python=3.4  CONDA_PY=34
     - python=3.5  CONDA_PY=35
-
-  global:
-    - ORGNAME="omnia"
-    - PACKAGENAME="sams"
-    # Testing
-    - OPENMM_CPU_THREADS="2"
-    # OpenEye toolkit
-    - OE_LICENSE="$HOME/oe_license.txt"
-    - OPENEYE_CHANNEL="-i https://pypi.anaconda.org/openeye/channel/main/simple"
-    # encrypted BINSTAR_TOKEN for push of dev package to binstar
-    - secure: "Iw2yv40ElSbS/TstXS9YnsbJFbxsbFQ25fkWlq8H/O3SPJwpX2/PRoCo99R1Scc0mO9BiVMwGDJQeM9y1VoYo3ozv5SIhPvc+0cMOE3AzkRiFEpZeTtDUTxOWsb+k/x5dH5/AapXRtJeKhY3cWe3lhKdv9N+yWrhY29lawXgfU4WsOEl6ON9BPwwPzvKK1sP4z8kIMzDNjt6gJ3m1HzdEQe/ibrOJIEk6Z4kTLQo9z4F9dm73/L4scEgnW6SOACC39nuYCL8PK4zPNKTqpAoVkm18uyrRz62+qPYSl3RCBNOFtbAuz7fz+ShSMA6g//LpAobNptpQeQpWXkHhYk5ALc6xzH2zScVgrPytKAPwi8mYKq9gYZnUPYgpOdjK3bNyfkGjeV9I4sQwNCBYlKtGHoqZ1l+l6oYsbx+Ti+nIeK67ufGmAugH4GJ3dhZvP6ZR73/irOrvSWiJJgqI1/k4c9Ela4wDpQHDp9sRf03HgSrRTX2gQ3E/JmPx8s56tMdkmrIDIgy6Edc80AN6zEKX0+3YVGcH6ltUViDidRGDlZ7xbUUXYtjqMJXuJEh2SV/wbeVmrBM8Pn+IfsBzLKnd1jqe3pXfoCqbCtvNwW8Sr4qMgWBEHvEtB4C5KvO5CydmRx95q/0ziRGb/VEV6QOnGxT7EIJDfyQeUqNqJD7Bdo="
-    # encrypted AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
-    #- secure: "SrSd1JoI8dBXQxDAX0xBTYBinTusRBQoPETnxHrBAgKdoty1pkzaghTKNMsrGsk78iwkkj1hAyttIY9trdFQkmx+OTx0fLKFmDHsMkgko4RzTtrgLgoxuRIs/gruID2cN1XKEbxlhRmQF14+q8/X1q6iGGdYMrxo51JcYPuEOSo="
-    #- secure: "br6QRMYXhHltYTEh/d+zejxcunT3GsqwQvxxLmqnLxi+LIxX4j7eymR6p4fPBd5mCRxyvkQEjnSZxF6e7JlEKxWVcMG28I/dBWzVIRW3EKQQNRmyI+JL1dfNaqj68kHJD+FknBwHK9LD238JPcyqXPdVrm9iPkDijPczvPBxvDs="
+    - python=3.6  CONDA_PY=36
+global:
+  - ORGNAME="omnia"
+  - PACKAGENAME="sams"
+  # Testing
+  - OPENMM_CPU_THREADS="2"
+  # OpenEye toolkit
+  - OE_LICENSE="$HOME/oe_license.txt"
+  - OPENEYE_CHANNEL="-i https://pypi.anaconda.org/openeye/channel/main/simple"
+  # encrypted BINSTAR_TOKEN for push of dev package to binstar
+  - secure: "Iw2yv40ElSbS/TstXS9YnsbJFbxsbFQ25fkWlq8H/O3SPJwpX2/PRoCo99R1Scc0mO9BiVMwGDJQeM9y1VoYo3ozv5SIhPvc+0cMOE3AzkRiFEpZeTtDUTxOWsb+k/x5dH5/AapXRtJeKhY3cWe3lhKdv9N+yWrhY29lawXgfU4WsOEl6ON9BPwwPzvKK1sP4z8kIMzDNjt6gJ3m1HzdEQe/ibrOJIEk6Z4kTLQo9z4F9dm73/L4scEgnW6SOACC39nuYCL8PK4zPNKTqpAoVkm18uyrRz62+qPYSl3RCBNOFtbAuz7fz+ShSMA6g//LpAobNptpQeQpWXkHhYk5ALc6xzH2zScVgrPytKAPwi8mYKq9gYZnUPYgpOdjK3bNyfkGjeV9I4sQwNCBYlKtGHoqZ1l+l6oYsbx+Ti+nIeK67ufGmAugH4GJ3dhZvP6ZR73/irOrvSWiJJgqI1/k4c9Ela4wDpQHDp9sRf03HgSrRTX2gQ3E/JmPx8s56tMdkmrIDIgy6Edc80AN6zEKX0+3YVGcH6ltUViDidRGDlZ7xbUUXYtjqMJXuJEh2SV/wbeVmrBM8Pn+IfsBzLKnd1jqe3pXfoCqbCtvNwW8Sr4qMgWBEHvEtB4C5KvO5CydmRx95q/0ziRGb/VEV6QOnGxT7EIJDfyQeUqNqJD7Bdo="
+  # encrypted AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY
+  #- secure: "SrSd1JoI8dBXQxDAX0xBTYBinTusRBQoPETnxHrBAgKdoty1pkzaghTKNMsrGsk78iwkkj1hAyttIY9trdFQkmx+OTx0fLKFmDHsMkgko4RzTtrgLgoxuRIs/gruID2cN1XKEbxlhRmQF14+q8/X1q6iGGdYMrxo51JcYPuEOSo="
+  #- secure: "br6QRMYXhHltYTEh/d+zejxcunT3GsqwQvxxLmqnLxi+LIxX4j7eymR6p4fPBd5mCRxyvkQEjnSZxF6e7JlEKxWVcMG28I/dBWzVIRW3EKQQNRmyI+JL1dfNaqj68kHJD+FknBwHK9LD238JPcyqXPdVrm9iPkDijPczvPBxvDs="
 
 after_success:
   - echo "after_success"
-  - if [ "$TRAVIS_SECURE_ENV_VARS" == true ]; then ./devtools/travis-ci/after_success.sh; fi
+  - if [ "$TRAVIS_SECURE_ENV_VARS" == true ]; then source devtools/travis-ci/after_success.sh; fi
