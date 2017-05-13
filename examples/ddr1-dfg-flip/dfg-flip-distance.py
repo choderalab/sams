@@ -41,7 +41,7 @@ min_distance = 5.0 * unit.angstroms
 max_distance = 25.0 * unit.angstroms
 distance_unit = unit.angstroms
 numbrellas = int((max_distance - min_distance) / umbrella_sigma + 2)
-umbrella_distances = np.linspace(min_distance/distance_unit, max_distance/distance_unit, numbrellas) * unit.angstroms
+umbrella_distances = np.linspace(min_distance/distance_unit, max_distance/distance_unit, numbrellas) * distance_unit
 
 # Output SAMS filename
 netcdf_filename = 'output.nc'
