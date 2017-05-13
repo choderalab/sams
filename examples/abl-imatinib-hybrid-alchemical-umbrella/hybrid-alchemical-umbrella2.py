@@ -46,7 +46,6 @@ dcd_trajectory_filename = 'trajectory.dcd' # DCD format for trajectory to be wri
 # Simulation conditions
 temperature = 298.0 * unit.kelvin
 pressure = 1.0 * unit.atmospheres
-pressure = None # WARNING: This is a temporary workaround for some issues with the GTX-1080.
 timestep = 2.0 * unit.femtoseconds
 minimize = True # if True, will minimize the structure before simulation (highly recommended)
 
@@ -96,6 +95,7 @@ umbrella_force.addGlobalParameter('umbrella_K', 0.0) # spring constant
 umbrella_force.addGlobalParameter('umbrella_r0', 0.0) # umbrella distance
 umbrella_force.addBond(umbrella_atoms[0], umbrella_atoms[1], [])
 umbrella_K = kT/umbrella_sigma**2
+print('umbrella_K = %s' % str(umbrella_K))
 system.addForce(umbrella_force)
 
 # Create thermodynamic states
@@ -191,7 +191,7 @@ print('Running simulation...')
 exen_sampler.update_scheme = 'global-jump' # scheme for deciding which alchemical state to jump to
 exen_sampler.locality = thermodynamic_state_neighbors # neighbors to examine for each state
 sams_sampler.update_method = 'rao-blackwellized' # scheme for updating free energy estimates
-niterations = 2000 # number of iterations to run
+niterations = 10000 # number of iterations to run
 sams_sampler.run(niterations) # run sampler
 ncfile.close()
 

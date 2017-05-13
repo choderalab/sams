@@ -170,7 +170,7 @@ def write_trajectory_dcd(netcdf_filename, topology, pdb_trajectory_filename, dcd
     with DCDTrajectoryFile(dcd_trajectory_filename, 'w') as f:
         f.write(ncfile.variables['positions'][:,:,:] * 10.0) # angstroms
 
-def write_trajectory(netcdf_filename, topology, reference_pdb_filename, trajectory_filename):
+def write_trajectory(netcdf_filename, topology, reference_pdb_filename, trajectory_filename, strip_waters=True, image=False):
     """
     Write trajectory.
 
@@ -184,25 +184,31 @@ def write_trajectory(netcdf_filename, topology, reference_pdb_filename, trajecto
         PDB trajectory output filename
     trajectory_filename : str
         Output trajectory filename. Type is autodetected by extension (.xtc, .dcd, .pdb) recognized by MDTraj
+    strip_water : bool, optional, default=True
+        If True, water will be stripped.
+    image : bool, optional, default=False
+        If True, image molecules before writing.
 
     """
     ncfile = netCDF4.Dataset(netcdf_filename, 'r')
     [nsamples, nstates] = ncfile.variables['logZ'].shape
 
+    # Make selection
+    mdtraj_topology = mdtraj.Topology.from_openmm(topology)
+    dsl_selection = 'all'
+    if strip_waters:
+        dsl_selection = 'not water'
+    atom_indices = mdtraj_topology.select(dsl_selection)
+    selection_topology = mdtraj_topology.subset(atom_indices)
+
     # Convert to MDTraj trajectory.
     print('Creating MDTraj trajectory...')
-    mdtraj_topology = mdtraj.Topology.from_openmm(topology)
-    trajectory = mdtraj.Trajectory(ncfile.variables['positions'][:,:,:], mdtraj_topology)
+    trajectory = mdtraj.Trajectory(ncfile.variables['positions'][:,atom_indices,:], selection_topology)
     trajectory.unitcell_vectors = ncfile.variables['box_vectors'][:,:,:]
 
-    # Stripping water
-    print('Stripping water...')
-    solute = trajectory.topology.select('not water')
-    trajectory.atom_slice(solute, inplace=True)
-
-    # Center on receptor.
-    print('Imaging molecules...')
-    trajectory.image_molecules()
+    if image:
+        print('Imaging molecules...')
+        trajectory.image_molecules()
 
     # Write reference.pdb file
     print('Writing reference PDB file...')
