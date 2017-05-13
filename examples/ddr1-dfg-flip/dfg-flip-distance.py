@@ -19,6 +19,8 @@ from simtk.openmm import app
 import mdtraj as md
 import netCDF4
 
+from sams import ThermodynamicState
+
 ################################################################################
 # MAJOR SETTINGS AND PARAMETERS
 ################################################################################
@@ -38,8 +40,8 @@ umbrella_atoms = [2324,2851]
 min_distance = 5.0 * unit.angstroms
 max_distance = 25.0 * unit.angstroms
 distance_unit = unit.angstroms
-umbrella_distances = np.linspace(min_distance/distance_unit, max_distance/distance_unit, numbrellas) * unit.angstroms
 numbrellas = int((max_distance - min_distance) / umbrella_sigma + 2)
+umbrella_distances = np.linspace(min_distance/distance_unit, max_distance/distance_unit, numbrellas) * unit.angstroms
 
 # Output SAMS filename
 netcdf_filename = 'output.nc'
@@ -50,7 +52,8 @@ temperature = 298.0 * unit.kelvin
 pressure = 1.0 * unit.atmospheres
 collision_rate = 1.0 / unit.picoseconds
 timestep = 2.0 * unit.femtoseconds
-minimize = True # if True, will minimize the structure before simulation (highly recommended)
+#minimize = True # if True, will minimize the structure before simulation (highly recommended)
+minimize = False
 
 ################################################################################
 # SUBROUTINES
@@ -70,13 +73,14 @@ kT = kB * temperature
 beta = 1.0 / kT
 
 # Load system
-print('Loading system...")
+print('Loading system...')
 system = openmm.XmlSerializer.deserialize(read_file(system_xml_filename))
 pdbfile = app.PDBFile(state_pdb_filename)
 topology = pdbfile.topology
-print('System has %d atoms.' % system.getNumParticles())
-
 state = openmm.XmlSerializer.deserialize(read_file(state_xml_filename))
+positions = state.getPositions(asNumpy=True)
+box_vectors = state.getPeriodicBoxVectors()
+print('System has %d atoms.' % system.getNumParticles())
 
 forces = { force.__class__.__name__ : force for force in system.getForces() }
 if (pressure is not None) and ('MonteCarloBarostat' not in forces):
@@ -117,12 +121,13 @@ for umbrella_distance in umbrella_distances:
 
 # Select platform automatically; use mixed precision
 from openmmtools.integrators import GeodesicBAOABIntegrator
-integrator = GeodesicBAOABIntegrator(temperature, collision_rate, timestep)
+integrator = GeodesicBAOABIntegrator(temperature=temperature, collision_rate=collision_rate, timestep=timestep)
 context = openmm.Context(system, integrator)
 platform = context.getPlatform()
 del context
 try:
     platform.setPropertyDefaultValue('Precision', 'mixed')
+    platform.setPropertyDefaultValue('DeterministicForces', 'true')
 except:
     pass
 
@@ -131,7 +136,8 @@ if minimize:
     print('Minimizing...')
     integrator = openmm.VerletIntegrator(timestep)
     context = openmm.Context(system, integrator)
-    context.setPositions(positions)
+    context.setPeriodicBoxVectors(*state.getPeriodicBoxVectors())
+    context.setPositions(state.getPositions(asNumpy=True))
     print("Initial energy is %12.3f kcal/mol" % (context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
     TOL = 1.0
     MAX_STEPS = 500
@@ -151,7 +157,7 @@ print('Setting up samplers...')
 from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
 thermodynamic_state_index = 0 # initial thermodynamic state index
 thermodynamic_state = thermodynamic_states[thermodynamic_state_index]
-sampler_state = SamplerState(positions=positions)
+sampler_state = SamplerState(positions=positions, box_vectors=box_vectors)
 mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=ncfile, platform=platform)
 mcmc_sampler.timestep = timestep
 mcmc_sampler.nsteps = 2500
@@ -174,9 +180,9 @@ outfile.close()
 print('Running simulation...')
 #exen_sampler.update_scheme = 'restricted-range' # scheme for deciding which alchemical state to jump to
 exen_sampler.update_scheme = 'global-jump' # scheme for deciding which alchemical state to jump to
-exen_sampler.locality = thermodynamic_state_neighbors # neighbors to examine for each state
+#exen_sampler.locality = thermodynamic_state_neighbors # neighbors to examine for each state
 sams_sampler.update_method = 'rao-blackwellized' # scheme for updating free energy estimates
-niterations = 2000 # number of iterations to run
+niterations = 1000 # number of iterations to run
 sams_sampler.run(niterations) # run sampler
 ncfile.close()
 
