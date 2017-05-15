@@ -32,24 +32,28 @@ state_pdb_filename = 'setup/state_DFG_IN.pdb'
 pdb_filename = 'setup/systems/Abl-STI/complex.pdb'
 
 # Specify umbrellas for distance restraint
-umbrella_sigma = 5*unit.degrees # umbrella stddev width in absence of external PMF (no Jacobian)
+umbrella_sigma = 0.5 * unit.angstroms # umbrella stddev width in absence of external PMF (no Jacobian)
 
-umbrella_atoms = [2817, 2815, 2825, 2830] # atoms involved in umbrella restraint
-#ATOM   2818  CB  ALA A 180       1.927  52.416  41.379  1.00  0.00           C  
-#ATOM   2816  CA  ALA A 180       3.319  52.098  40.823  1.00  0.00           C  
-#ATOM   2826  CA  ASP A 181       5.071  50.442  43.834  1.00  0.00           C  
-#ATOM   2831  CG  ASP A 181       2.928  49.040  44.337  1.00  0.00           C  
+umbrella1_atoms = [2852, 2395]
+# from setup/state_DFG_IN.pdb (numbering of atoms and residues starts at 1)
+# ATOM   2853  CZ  PHE A 182       7.042  50.460  38.882  1.00  0.00           C  
+# ATOM   2396  CB  LEU A 154      10.392  50.918  33.845  1.00  0.00           C  
 
-min_dihedral = -180*unit.degrees
-max_dihedral = +180*unit.degrees
-dihedral_unit = unit.degrees
-numbrellas = int((max_dihedral - min_dihedral) / umbrella_sigma + 2)
-umbrella_values = np.linspace(min_dihedral/dihedral_unit, max_dihedral/dihedral_unit, numbrellas) * dihedral_unit
+umbrella2_atoms = [2830, 836]
+# from setup/state_DFG_IN.pdb (numbering of atoms and residues starts at 1)
+# ATOM   2831  CG  ASP A 181       2.928  49.040  44.337  1.00  0.00           C  
+# ATOM    837  NZ  LYS A  52      10.684  52.314  46.848  1.00  0.00           N  
+
+min_distance = 3.0 * unit.angstroms
+max_distance = 20.0 * unit.angstroms
+distance_unit = unit.angstroms
+numbrellas = int((max_distance - min_distance) / umbrella_sigma + 2)
+umbrella_distances = np.linspace(min_distance/distance_unit, max_distance/distance_unit, numbrellas) * distance_unit
 
 # Output SAMS filename
-netcdf_filename = 'output.nc'
-pdb_trajectory_filename = 'trajectory.pdb' # first frame of trajectory to be written at end
-dcd_trajectory_filename = 'trajectory.dcd' # DCD format for trajectory to be written at end
+netcdf_filename = '2d-distance-output.nc'
+pdb_trajectory_filename = '2d-distance-trajectory.pdb' # first frame of trajectory to be written at end
+xtc_trajectory_filename = '2d-distance-trajectory.xtc' # DCD format for trajectory to be written at end
 # Simulation conditions
 temperature = 298.0 * unit.kelvin
 pressure = 1.0 * unit.atmospheres
@@ -96,15 +100,21 @@ else:
     pass
 
 # Add umbrella restraint with global variable to control umbrella position
-print('umbrella schedule for dihedral defined by atoms %s : %s' % (str(umbrella_atoms), str(umbrella_values)))
+print('umbrella schedule atoms %s : %s' % (str(umbrella1_atoms), str(umbrella_distances)))
+print('umbrella schedule atoms %s : %s' % (str(umbrella2_atoms), str(umbrella_distances)))
+energy_function = '(umbrella1_K/2.0)*(r-umbrella1_r0)^2'
+umbrella_force = openmm.CustomBondForce(energy_function)
+umbrella_force.addGlobalParameter('umbrella1_K', 0.0) # spring constant
+umbrella_force.addGlobalParameter('umbrella1_r0', 0.0) # umbrella distance
+umbrella_force.addBond(*umbrella1_atoms, [])
+umbrella_K = kT/umbrella_sigma**2
+system.addForce(umbrella_force)
 
-from numpy import pi
-energy_function = '- (umbrella_K/2) * cos(min(dtheta, 2*pi-dtheta)); dtheta = abs(theta-umbrella_r0);'
-energy_function += 'pi = %f;' % pi
-umbrella_force = openmm.CustomTorsionForce(energy_function)
-umbrella_force.addGlobalParameter('umbrella_K', 0.0)
-umbrella_force.addGlobalParameter('umbrella_r0', 0.0)
-umbrella_force.addTorsion(*umbrella_atoms, [])
+energy_function = '(umbrella2_K/2.0)*(r-umbrella2_r0)^2'
+umbrella_force = openmm.CustomBondForce(energy_function)
+umbrella_force.addGlobalParameter('umbrella2_K', 0.0) # spring constant
+umbrella_force.addGlobalParameter('umbrella2_r0', 0.0) # umbrella distance
+umbrella_force.addBond(*umbrella2_atoms, [])
 umbrella_K = kT/umbrella_sigma**2
 system.addForce(umbrella_force)
 
@@ -113,17 +123,20 @@ thermodynamic_states = list()
 
 # Umbrella off state
 parameters = {
-    'umbrella_K' : 0.0, 'umbrella_r0' : 0.0, # umbrella parameters
+    'umbrella1_K' : 0.0, 'umbrella1_r0' : 0.0, # umbrella parameters
+    'umbrella2_K' : 0.0, 'umbrella2_r0' : 0.0, # umbrella parameters
 }
 thermodynamic_states.append( ThermodynamicState(system=system, temperature=temperature, pressure=pressure, parameters=parameters) )
 
 # Umbrella on state
 alchemical_lambda = 0.0
-for umbrella_value in umbrella_values:
-    parameters = {
-        'umbrella_K' : umbrella_K.value_in_unit_system(unit.md_unit_system), 'umbrella_r0' : umbrella_value.value_in_unit_system(unit.md_unit_system), # umbrella parameters
-    }
-    thermodynamic_states.append( ThermodynamicState(system=system, temperature=temperature, pressure=pressure, parameters=parameters) )
+for umbrella1_distance in umbrella_distances:
+    for umbrella2_distance in umbrella_distances:
+        parameters = {
+            'umbrella1_K' : umbrella_K.value_in_unit_system(unit.md_unit_system), 'umbrella1_r0' : umbrella1_distance.value_in_unit_system(unit.md_unit_system), # umbrella parameters
+            'umbrella2_K' : umbrella_K.value_in_unit_system(unit.md_unit_system), 'umbrella2_r0' : umbrella2_distance.value_in_unit_system(unit.md_unit_system), # umbrella parameters
+            }
+        thermodynamic_states.append( ThermodynamicState(system=system, temperature=temperature, pressure=pressure, parameters=parameters) )
 
 # Select platform automatically; use mixed precision
 from openmmtools.integrators import GeodesicBAOABIntegrator
@@ -166,7 +179,7 @@ thermodynamic_state = thermodynamic_states[thermodynamic_state_index]
 sampler_state = SamplerState(positions=positions, box_vectors=box_vectors)
 mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=ncfile, platform=platform)
 mcmc_sampler.timestep = timestep
-mcmc_sampler.nsteps = 500
+mcmc_sampler.nsteps = 2500
 #mcmc_sampler.pdbfile = open('output.pdb', 'w') # uncomment this if you want to write a PDB trajectory as you simulate; WARNING: LARGE!
 mcmc_sampler.topology = topology
 mcmc_sampler.verbose = True
@@ -176,9 +189,9 @@ sams_sampler = SAMSSampler(exen_sampler)
 sams_sampler.verbose = True
 
 # DEBUG: Write PDB of initial frame
-print("Writing initial frame to 'initial.pdb'...")
+print("Writing initial frame to '2d-distance-initial.pdb'...")
 from simtk.openmm.app import PDBFile
-outfile = open('initial.pdb', 'w')
+outfile = open('2d-distance-initial.pdb', 'w')
 PDBFile.writeFile(topology, positions, outfile)
 outfile.close()
 
@@ -188,7 +201,7 @@ print('Running simulation...')
 exen_sampler.update_scheme = 'global-jump' # scheme for deciding which alchemical state to jump to
 #exen_sampler.locality = thermodynamic_state_neighbors # neighbors to examine for each state
 sams_sampler.update_method = 'rao-blackwellized' # scheme for updating free energy estimates
-niterations = 20000 # number of iterations to run
+niterations = 5000 # number of iterations to run
 sams_sampler.run(niterations) # run sampler
 ncfile.close()
 
@@ -198,8 +211,6 @@ from sams import analysis
 from collections import namedtuple
 MockTestsystem = namedtuple('MockTestsystem', ['description', 'thermodynamic_states'])
 testsystem = MockTestsystem(description='DDR1 umbrella states', thermodynamic_states=thermodynamic_states)
-analysis.analyze(netcdf_filename, testsystem, 'output.pdf')
+analysis.analyze(netcdf_filename, testsystem, '2d-distance-output.pdf')
 # Write trajectory
-reference_pdb_filename = 'trajectory.pdb'
-trajectory_filename = 'trajectory.xtc'
-analysis.write_trajectory(netcdf_filename, topology, reference_pdb_filename, trajectory_filename)
+analysis.write_trajectory(netcdf_filename, topology, pdb_trajectory_filename, xtc_trajectory_filename)
