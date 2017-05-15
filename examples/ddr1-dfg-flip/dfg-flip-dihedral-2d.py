@@ -32,9 +32,15 @@ state_pdb_filename = 'setup/state_DFG_IN.pdb'
 pdb_filename = 'setup/systems/Abl-STI/complex.pdb'
 
 # Specify umbrellas for distance restraint
-umbrella_sigma = 5*unit.degrees # umbrella stddev width in absence of external PMF (no Jacobian)
+umbrella_sigma = 10*unit.degrees # umbrella stddev width in absence of external PMF (no Jacobian)
 
-umbrella_atoms = [2817, 2815, 2825, 2830] # atoms involved in umbrella restraint
+umbrella1_atoms = [2817, 2815, 2825, 2830] # atoms involved in umbrella restraint
+#ATOM   2818  CB  ALA A 180       1.927  52.416  41.379  1.00  0.00           C  
+#ATOM   2816  CA  ALA A 180       3.319  52.098  40.823  1.00  0.00           C  
+#ATOM   2826  CA  ASP A 181       5.071  50.442  43.834  1.00  0.00           C  
+#ATOM   2831  CG  ASP A 181       2.928  49.040  44.337  1.00  0.00           C  
+
+umbrella2_atoms = [2817, 2815, 2825, 2830] # atoms involved in umbrella restraint
 #ATOM   2818  CB  ALA A 180       1.927  52.416  41.379  1.00  0.00           C  
 #ATOM   2816  CA  ALA A 180       3.319  52.098  40.823  1.00  0.00           C  
 #ATOM   2826  CA  ASP A 181       5.071  50.442  43.834  1.00  0.00           C  
@@ -43,8 +49,8 @@ umbrella_atoms = [2817, 2815, 2825, 2830] # atoms involved in umbrella restraint
 min_dihedral = -180*unit.degrees
 max_dihedral = +180*unit.degrees
 dihedral_unit = unit.degrees
-numbrellas = int((max_dihedral - min_dihedral) / umbrella_sigma + 2)
-umbrella_values = np.linspace(min_dihedral/dihedral_unit, max_dihedral/dihedral_unit, numbrellas) * dihedral_unit
+numbrellas = int((max_dihedral - min_dihedral) / umbrella_sigma)
+umbrella_values = np.linspace((min_dihedral+umbrella_sigma/2)/dihedral_unit, (max_dihedral-umbrella_sigma/2)/dihedral_unit, numbrellas) * dihedral_unit
 
 # Output SAMS filename
 netcdf_filename = 'output.nc'
