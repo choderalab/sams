@@ -15,24 +15,32 @@ requirements:
     - setuptools
     - numpy
     - scipy
-    - pymbar-dev
-    - openmm-dev
-    - parmed-dev
-    - openmoltools-dev
-    - alchemy-dev
-    - openmmtools-dev
+    - pymbar
+    - openmm
+    - netcdf4
+    - parmed
+    - openmoltools
+    - alchemy >=1.2.1
+    - openmmtools
+    - matplotlib
+    - seaborn
+    - mdtraj
 
   run:
     - python
     - setuptools
     - numpy
     - scipy
-    - pymbar-dev
-    - openmm-dev
-    - parmed-dev
-    - openmoltools-dev
-    - alchemy-dev
-    - openmmtools-dev
+    - pymbar
+    - openmm
+    - netcdf4
+    - parmed
+    - openmoltools
+    - alchemy >=1.2.1
+    - openmmtools
+    - matplotlib
+    - seaborn
+    - mdtraj
 
 test:
   requires:
@@ -41,7 +49,8 @@ test:
   imports:
     - sams
 
-
 about:
-  home: https://github.com/choderalab/perses
-  license: GNU Lesser General Public License v2 or later (LGPLv2+)
+  home: https://github.com/choderalab/sams
+  license: MIT
+  license_file: LICENSE
+  summary: Self-adjusted mixture sampling toolkit for molecular simulations
