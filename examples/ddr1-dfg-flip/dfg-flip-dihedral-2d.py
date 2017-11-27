@@ -31,26 +31,44 @@ state_xml_filename = 'setup/state_DFG_IN.xml'
 state_pdb_filename = 'setup/state_DFG_IN.pdb'
 pdb_filename = 'setup/systems/Abl-STI/complex.pdb'
 
+top = md.load(state_pdb_filename).topology
+
 # Specify umbrellas for distance restraint
-umbrella_sigma = 10*unit.degrees # umbrella stddev width in absence of external PMF (no Jacobian)
+angle_sigma = 10*unit.degrees # umbrella stddev width in absence of external PMF (no Jacobian)
+distance_sigma = 1*unit.angstroms # umbrella stddev width
 
-umbrella1_atoms = [2817, 2815, 2825, 2830] # atoms involved in umbrella restraint
-#ATOM   2818  CB  ALA A 180       1.927  52.416  41.379  1.00  0.00           C  
-#ATOM   2816  CA  ALA A 180       3.319  52.098  40.823  1.00  0.00           C  
-#ATOM   2826  CA  ASP A 181       5.071  50.442  43.834  1.00  0.00           C  
-#ATOM   2831  CG  ASP A 181       2.928  49.040  44.337  1.00  0.00           C  
+# add our known kinase coordinates
+# Roux pseudo-dihedral
+Roux = ['resid 179 and resname ALA and name CB',
+        'resid 179 and resname ALA and name CA',
+        'resid 180 and resname ASP and name CA',
+        'resid 180 and resname ASP and name CG']
 
-umbrella2_atoms = [2817, 2815, 2825, 2830] # atoms involved in umbrella restraint
-#ATOM   2818  CB  ALA A 180       1.927  52.416  41.379  1.00  0.00           C  
-#ATOM   2816  CA  ALA A 180       3.319  52.098  40.823  1.00  0.00           C  
-#ATOM   2826  CA  ASP A 181       5.071  50.442  43.834  1.00  0.00           C  
-#ATOM   2831  CG  ASP A 181       2.928  49.040  44.337  1.00  0.00           C  
+Roux_atoms = list()
+for atom in Roux:
+    atom_select = int(top.select(atom)[0])
+    Roux_atoms.append(atom_select)
+
+# DFG distance
+DFG_distance = ['resid 149 and resname GLY and name CA',
+                'resid 181 and resname PHE and name CZ']
+
+DFG_atoms = list()
+for atom in DFG_distance:
+    atom_select = int(top.select(atom)[0])
+    DFG_atoms.append(atom_select)
 
 min_dihedral = -180*unit.degrees
 max_dihedral = +180*unit.degrees
 dihedral_unit = unit.degrees
-numbrellas = int((max_dihedral - min_dihedral) / umbrella_sigma)
-umbrella_values = np.linspace((min_dihedral+umbrella_sigma/2)/dihedral_unit, (max_dihedral-umbrella_sigma/2)/dihedral_unit, numbrellas) * dihedral_unit
+ntorsion_umbrellas = int((max_dihedral - min_dihedral) / angle_sigma)
+torsion_umbrella_values = np.linspace((min_dihedral+angle_sigma/2)/dihedral_unit, (max_dihedral-angle_sigma/2)/dihedral_unit, ntorsion_umbrellas) * dihedral_unit
+
+min_distance = 1.0*unit.angstroms
+max_distance = 10.0*unit.angstroms
+distance_unit = unit.angstroms
+ndistance_umbrellas = int((max_distance - min_distance) / distance_sigma)
+distance_umbrella_values = np.linspace((min_distance+distance_sigma/2)/distance_unit, (max_distance-distance_sigma/2)/distance_unit, ndistance_umbrellas) * distance_unit
 
 # Output SAMS filename
 netcdf_filename = 'output.nc'
@@ -102,16 +120,25 @@ else:
     pass
 
 # Add umbrella restraint with global variable to control umbrella position
-print('umbrella schedule for dihedral defined by atoms %s : %s' % (str(umbrella_atoms), str(umbrella_values)))
+print('umbrella schedule for dihedral defined by atoms %s : %s' % (str(Roux_atoms), str(torsion_umbrella_values)))
+print('umbrella schedule for distance defined by atoms %s : %s' % (str(DFG_atoms), str(distance_umbrella_values)))
 
 from numpy import pi
-energy_function = '- (umbrella_K/2) * cos(min(dtheta, 2*pi-dtheta)); dtheta = abs(theta-umbrella_r0);'
+energy_function = '- (torsion_K/2) * cos(min(dtheta, 2*pi-dtheta)); dtheta = abs(theta-torsion_theta0);'
 energy_function += 'pi = %f;' % pi
 umbrella_force = openmm.CustomTorsionForce(energy_function)
-umbrella_force.addGlobalParameter('umbrella_K', 0.0)
-umbrella_force.addGlobalParameter('umbrella_r0', 0.0)
-umbrella_force.addTorsion(*umbrella_atoms, [])
-umbrella_K = kT/umbrella_sigma**2
+umbrella_force.addGlobalParameter('torsion_K', 0.0)
+umbrella_force.addGlobalParameter('torsion_theta0', 0.0)
+umbrella_force.addTorsion(*Roux_atoms, [])
+torsion_K = kT/angle_sigma**2
+system.addForce(umbrella_force)
+
+energy_function = '(distance_K/2) * (r-distance_r0)^2;'
+umbrella_force = openmm.CustomBondForce(energy_function)
+umbrella_force.addGlobalParameter('distance_K', 0.0)
+umbrella_force.addGlobalParameter('distance_r0', 0.0)
+umbrella_force.addBond(*DFG_atoms, [])
+distance_K = kT/distance_sigma**2
 system.addForce(umbrella_force)
 
 # Create thermodynamic states
@@ -119,21 +146,24 @@ thermodynamic_states = list()
 
 # Umbrella off state
 parameters = {
-    'umbrella_K' : 0.0, 'umbrella_r0' : 0.0, # umbrella parameters
+    'torsion_K' : 0.0, 'torsion_theta0' : 0.0, # umbrella parameters
+    'distance_K' : 0.0, 'distance_r0' : 0.0, # umbrella parameters
 }
 thermodynamic_states.append( ThermodynamicState(system=system, temperature=temperature, pressure=pressure, parameters=parameters) )
 
 # Umbrella on state
 alchemical_lambda = 0.0
-for umbrella_value in umbrella_values:
-    parameters = {
-        'umbrella_K' : umbrella_K.value_in_unit_system(unit.md_unit_system), 'umbrella_r0' : umbrella_value.value_in_unit_system(unit.md_unit_system), # umbrella parameters
-    }
-    thermodynamic_states.append( ThermodynamicState(system=system, temperature=temperature, pressure=pressure, parameters=parameters) )
+for theta0 in torsion_umbrella_values:
+    for r0 in distance_umbrella_values:
+        parameters = {
+            'torsion_K' : torsion_K.value_in_unit_system(unit.md_unit_system), 'torsion_theta0' : theta0.value_in_unit_system(unit.md_unit_system), # umbrella parameters
+            'distance_K' : distance_K.value_in_unit_system(unit.md_unit_system), 'distance_r0' : r0.value_in_unit_system(unit.md_unit_system), # umbrella parameters
+        }
+        thermodynamic_states.append( ThermodynamicState(system=system, temperature=temperature, pressure=pressure, parameters=parameters) )
 
 # Select platform automatically; use mixed precision
-from openmmtools.integrators import GeodesicBAOABIntegrator
-integrator = GeodesicBAOABIntegrator(temperature=temperature, collision_rate=collision_rate, timestep=timestep)
+from openmmtools.integrators import LangevinIntegrator
+integrator = LangevinIntegrator(temperature=temperature, collision_rate=collision_rate, timestep=timestep)
 context = openmm.Context(system, integrator)
 platform = context.getPlatform()
 del context
