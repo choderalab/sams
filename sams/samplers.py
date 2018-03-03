@@ -1002,14 +1002,17 @@ class SAMSSampler(object):
             else:
                 # Use first stage scheme.
                 if self.ncfile: self.ncfile.variables['stage'][self.iteration] = 1
-                beta_factor = 0.6
+                #beta_factor = 0.6
+                beta_factor = 0.4
                 t = self.iteration + 1.0
                 gamma = min(pi_k[current_state], t**(-beta_factor)) # Eq. 15
                 #gamma = t**(-beta_factor) # Modified version of Eq. 15
 
-                # Check if all state histograms are "flat" within 20% so we can enter the second stage
-                RELATIVE_HISTOGRAM_ERROR_THRESHOLD = 0.20
+                # Check if all state histograms are "flat" within 10% so we can enter the second stage
+                RELATIVE_HISTOGRAM_ERROR_THRESHOLD = 0.10
                 N_k = self.sampler.number_of_state_visits[:]
+                print('N_k:') # DEBUG
+                print(N_k) # DEBUG
                 empirical_pi_k = N_k[:] / N_k.sum()
                 pi_k = np.exp(self.log_target_probabilities)
                 relative_error_k = np.abs(pi_k - empirical_pi_k) / pi_k

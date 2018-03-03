@@ -21,7 +21,7 @@ requirements:
     - parmed
     - openmoltools
     - alchemy >=1.2.1
-    - openmmtools
+    - openmmtools >=0.9.4
     - matplotlib
     - seaborn
     - mdtraj
@@ -37,7 +37,7 @@ requirements:
     - parmed
     - openmoltools
     - alchemy >=1.2.1
-    - openmmtools
+    - openmmtools >=0.9.4
     - matplotlib
     - seaborn
     - mdtraj
