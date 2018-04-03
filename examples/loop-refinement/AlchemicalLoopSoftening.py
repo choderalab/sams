@@ -11,6 +11,32 @@ import mdtraj as md
 from sams.tests.testsystems import SAMSTestSystem
 
 
+def minimize(testsystem, positions):
+    print("Minimizing...")
+    integrator = openmm.LangevinIntegrator(300 * unit.kelvin, 90.0 / unit.picoseconds, 1.0 * unit.femtoseconds)
+    context = openmm.Context(testsystem, integrator)
+    context.setPositions(positions=positions)
+    print("Initial energy is %12.3f kcal/mol" % (
+    context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+    TOL = .90
+    MAX_STEPS = 200
+    openmm.LocalEnergyMinimizer.minimize(context, TOL, MAX_STEPS)
+    print("Final energy is   %12.3f kcal/mol" % (
+    context.getState(getEnergy=True).getPotentialEnergy() / unit.kilocalories_per_mole))
+
+    # Run some dynamics on minimized system
+    niterations = 10
+    nsteps_per_iteration = 50
+    for iteration in range(niterations):
+        integrator.step(nsteps_per_iteration)
+        potential_energy = context.getState(getEnergy=True).getPotentialEnergy()
+        print('Energy after iteration %d of %d steps : %s' % (
+        iteration, nsteps_per_iteration, potential_energy / unit.kilocalories_per_mole))
+
+    # Update positions
+    testsystem.positions = context.getState(getPositions=True).getPositions(asNumpy=True)
+    del context, integrator
+
 class LoopSoftening(SAMSTestSystem):
     """
     Alchemical free energy calculation for Abl:imatinib in explicit solvent.
@@ -71,46 +97,45 @@ class LoopSoftening(SAMSTestSystem):
         # Atom Selection using MDtraj
         res_pairs = [[403, 483], [1052, 1109]]
         t = md.load(pdb_filename)
-        alchemical_atoms = []
+        alchemical_atoms = set()
         for x in res_pairs:
             start = min(t.top.select('residue %s' % min(x)))
             end = max(t.top.select('residue %s' % max(x))) + 1
-            alchemical_atoms.append(list(range(start, end)))
-        #print(alchemical_atoms)
+            alchemical_atoms.union(set(range(start, end)))
 
-
-        # Add a MonteCarloBarostat
-        #temperature = 300 * unit.kelvin # will be replaced as thermodynamic state is updated
-        #pressure = 1.0 * unit.atmospheres
-        #barostat = openmm.MonteCarloBarostat(pressure, temperature)
-        #self.system.addForce(barostat)
 
         # Create thermodynamic states.
         print('Creating alchemically-modified system...')
         temperature = 300 * unit.kelvin
         pressure = 1.0 * unit.atmospheres
 
-        alchemical_atoms = range(0,69) # Abl:imatinib
         from alchemy import AbsoluteAlchemicalFactory
-        factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True, annihilate_sterics=False, softcore_beta=0.0) # turn off softcore electrostatics
+        factory = AbsoluteAlchemicalFactory(self.system, ligand_atoms=alchemical_atoms, annihilate_electrostatics=True,
+                                            alchemical_torsions=True, annihilate_sterics=True,
+                                            softcore_beta=0.0)  # turn off softcore electrostatics
         self.system = factory.createPerturbedSystem()
         print('Setting up alchemical intermediates...')
         from sams import ThermodynamicState
         self.thermodynamic_states = list()
-        for state in range(251):
-            parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/250.0) }
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
-        for state in range(1,251):
-            parameters = {'lambda_sterics' : (1.0 - float(state)/250.0), 'lambda_electrostatics' : 0.0 }
-            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature, parameters=parameters) )
+        for state in range(26):
+            parameters = {'lambda_sterics' : 1.0, 'lambda_electrostatics' : (1.0 - float(state)/25.0) }
+            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature,
+                                                                 parameters=parameters) )
+        for state in range(1,26):
+            parameters = {'lambda_sterics' : (1.0 - float(state)/25.0), 'lambda_electrostatics' : 0.0 }
+            self.thermodynamic_states.append( ThermodynamicState(system=self.system, temperature=temperature,
+                                                                 parameters=parameters) )
+
+        minimize(self.system, self.positions)
 
         # Create SAMS samplers
         print('Setting up samplers...')
         from sams.samplers import SamplerState, MCMCSampler, ExpandedEnsembleSampler, SAMSSampler
-        thermodynamic_state_index = 0 # initial thermodynamic state index
+        thermodynamic_state_index = 0  # initial thermodynamic state index
         thermodynamic_state = self.thermodynamic_states[thermodynamic_state_index]
-        sampler_state = SamplerState(positions=self.positions)
-        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state, ncfile=self.ncfile)
+        sampler_state = SamplerState(positions=self.system.positions)
+        self.mcmc_sampler = MCMCSampler(sampler_state=sampler_state, thermodynamic_state=thermodynamic_state,
+                                        ncfile=self.ncfile)
         self.mcmc_sampler.pdbfile = open('output.pdb', 'w')
         self.mcmc_sampler.topology = self.topology
         self.mcmc_sampler.verbose = True
@@ -119,16 +144,14 @@ class LoopSoftening(SAMSTestSystem):
         self.sams_sampler = SAMSSampler(self.exen_sampler)
         self.sams_sampler.verbose = True
 
-
 if __name__ == '__main__':
-
 
     netcdf_filename = 'output.nc'
 
     system = LoopSoftening(netcdf_filename=netcdf_filename)
-    system.exen_sampler.update_scheme = 'local-jump'
-    system.mcmc_sampler.nsteps = 500
+    system.exen_sampler.update_scheme = 'global-jump'
+    system.mcmc_sampler.nsteps = 5000
     system.exen_sampler.locality = 10
     system.sams_sampler.update_method = 'optimal'
-    niterations = 5
+    niterations = 10000
     system.sams_sampler.run(niterations)
