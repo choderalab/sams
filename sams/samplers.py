@@ -31,6 +31,7 @@ import copy
 import time
 from scipy.misc import logsumexp
 
+
 from openmmtools import testsystems
 
 ################################################################################
@@ -707,7 +708,12 @@ class ExpandedEnsembleSampler(object):
         self.log_P_k = np.zeros([self.nstates], np.float64)
         if self.update_scheme == 'local-jump':
             # Determine current neighborhood.
+<<<<<<< HEAD
+            neighborhood = set(range(max(0, current_state_index - self.locality), min(self.nstates, current_state_index + self.locality)))
+            neighborhood.remove(current_state_index) # remove current state
+=======
             neighborhood = range(max(0, current_state_index - self.locality), min(self.nstates, current_state_index + self.locality + 1))
+>>>>>>> upstream/master
             neighborhood_size = len(neighborhood)
             # Propose a move from the current neighborhood.
             proposed_state_index = np.random.choice(neighborhood, p=np.ones([len(neighborhood)], np.float64) / float(neighborhood_size))
